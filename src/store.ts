@@ -40,7 +40,7 @@ export class Store {
  }
  async claim(workerId:string):Promise<AttemptRow|undefined> {
   const client=await this.pool.connect();try{await client.query('BEGIN');
-   const row=(await client.query(`SELECT a.*,p.encrypted FROM attempts a LEFT JOIN signed_payloads p ON p.environment=a.environment AND p.tx_hash=a.tx_hash AND p.expires_at>now() LEFT JOIN worker_leases l USING(environment,tx_hash) WHERE a.state NOT IN ('succeeded','failed') AND a.next_check_at<=now() AND (l.lease_until IS NULL OR l.lease_until<=now()) ORDER BY a.next_check_at FOR UPDATE OF a SKIP LOCKED LIMIT 1`)).rows[0] as AttemptRow|undefined;
+   const row=(await client.query(`SELECT a.*,p.encrypted FROM attempts a LEFT JOIN signed_payloads p ON p.environment=a.environment AND p.tx_hash=a.tx_hash AND p.expires_at>now() LEFT JOIN worker_leases l ON l.environment=a.environment AND l.tx_hash=a.tx_hash WHERE a.state NOT IN ('succeeded','failed') AND a.next_check_at<=now() AND (l.lease_until IS NULL OR l.lease_until<=now()) ORDER BY a.next_check_at FOR UPDATE OF a SKIP LOCKED LIMIT 1`)).rows[0] as AttemptRow|undefined;
    if(row)await client.query(`INSERT INTO worker_leases(environment,tx_hash,worker_id,lease_until) VALUES($1,$2,$3,now()+interval '30 seconds') ON CONFLICT(environment,tx_hash) DO UPDATE SET worker_id=excluded.worker_id,lease_until=excluded.lease_until`,[row.environment,row.tx_hash,workerId]);
    await client.query('COMMIT');return row;
   }catch(e){await client.query('ROLLBACK');throw e;}finally{client.release();}

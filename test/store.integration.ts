@@ -41,6 +41,9 @@ describe('R04/R06/R07 durable PostgreSQL tracking',()=>{
  it('records before send and resumes after a crashed lease',async()=>{
   const {a}=attempt();await store.record(a,'attempt-key-000004');const initial=await store.claim(randomUUID());expect(initial?.encrypted).toBeTruthy();await pool.query("UPDATE worker_leases SET lease_until=now()-interval '1 second'");const recovered=await store.claim(randomUUID());expect(recovered?.tx_hash).toBe(a.txHash);expect(store.unseal(recovered!.encrypted!,a.environment+':'+a.txHash)).toBe(a.signedXdr);
  });
+ it('never exposes expired encrypted payloads to a recovery worker',async()=>{
+  const {a}=attempt();await store.record(a,'attempt-key-expired-0001');await pool.query("UPDATE signed_payloads SET expires_at=now()-interval '1 second'");const row=await store.claim(randomUUID());expect(row?.tx_hash).toBe(a.txHash);expect(row?.encrypted).toBeNull();
+ });
  it('persists unsigned reviews and handles expired/wrong-environment lookup',async()=>{
   const {f}=attempt();const saved=await store.saveReview(f.review);expect((await store.getReview(saved.reviewId!,'testnet'))?.expired).toBe(true);expect(await store.getReview(saved.reviewId!,'local')).toBeUndefined();
  });
