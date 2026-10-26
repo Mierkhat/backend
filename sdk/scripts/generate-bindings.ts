@@ -1,0 +1,13 @@
+import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { resolve } from 'node:path';
+import { contract } from '@stellar/stellar-sdk';
+const root=resolve(fileURLToPath(new URL('../../..',import.meta.url)));
+const wasm=resolve(root,'contracts/target/wasm32v1-none/release/mierkhat_guard.wasm');
+const out=resolve(root,'backend/sdk/src/generated');mkdirSync(out,{recursive:true});
+const spec=contract.Spec.fromWasm(readFileSync(wasm));
+writeFileSync(resolve(out,'spec.json'),JSON.stringify(spec.entries.map(e=>e.toXDR('base64')),null,2)+'\n');
+execFileSync('stellar',['contract','bindings','typescript','--wasm',wasm,'--output-dir',resolve(root,'.tooling/generated'),'--overwrite'],{stdio:'inherit'});
+const source=readFileSync(resolve(root,'.tooling/generated/src/index.ts'),'utf8');
+writeFileSync(resolve(out,'types.ts'),'// Generated from compiled guard ABI. Do not edit.\nimport type {u32,u64,i128,Option} from "@stellar/stellar-sdk/contract";\n'+source.slice(source.indexOf('export interface CodePin'),source.indexOf('export interface Client')).replaceAll('Buffer','Uint8Array'));
