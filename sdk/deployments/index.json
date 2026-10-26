@@ -1,1 +1,67 @@
-[]
+[
+  {
+    "environment": "testnet",
+    "epoch": "integration-fixture-v1",
+    "enabled": false,
+    "reviewed": false,
+    "networkPassphrase": "Test SDF Network ; September 2015",
+    "guard": "CA42L7LDVJMI2BXBNRURXF6K6MVCTBZGND6RP5NYFEGIGWR3HTLNTT74",
+    "guardWasmHash": "515bcffd6ee75c51cf4ff65b054751e562a5f6ad8814cce4c9b9572942e91269",
+    "profileHash": "34e6e0678f5f12715481a18137d811a7b4c58f65509de2bfeeeb284e1c2217ce",
+    "profile": {
+      "schema": 1,
+      "network_id": "cee0302d59844d32bdca915c8203dd44b33fbb7edc19051ea37abedf28ecd472",
+      "vault": {
+        "address": "CA7BC5WFIE4TEE7UATJQDWMLMO242B5S3GCVZOGXHYEDABXLZNKXBBWX",
+        "wasm_hash": "e2786bd6693a117ec0d9c4acfab940d74a99687ea26e5273342adbd802a68dd9"
+      },
+      "router": {
+        "address": "CBATOXK3UEPQZXEWKDCPU2D26V27IEZYXASJJGE5ZOUAUHZH2DSDP7TW",
+        "wasm_hash": "394539a70060065116930cdbb5d301f299621025985ba9693c7e58142e642539"
+      },
+      "factory": {
+        "address": "CBNLZ7V5BG4UYZ645GXY7MGYYE3I676K7AMLVNQAZI5NIWOOXO36ILZZ",
+        "wasm_hash": "93ff0f4a634feceae6fb21b587b9508b58cbce8100da2eed0f53601ecf0533a6"
+      },
+      "settlement": "CDARIATHAO4DTSGHZDQQQRH7HUO6O2DOOVOCVYIIL4DXVFG3GXN6VTDR",
+      "assets": [
+        {
+          "asset": "CCECTMZ4PJIIHUVCUTGFVOBNJ5WA5JQSCTHJIQCXILMU2WKYWGFNJ45G",
+          "pair": {
+            "address": "CAAROB2VSLSORTRLQ7OSND5YXFYQWOI4ZYQ5VHOXHGFINZCOVHAT4FD4",
+            "wasm_hash": "aae8760f5eebdfefa66914cf98e4cf945f9bac4aa8e5613d4e9e2d423a438d8a"
+          }
+        },
+        {
+          "asset": "CBNVWZ5GBPOEISLJDBIVZS5MQASTX3ZK773CGXYBB2KN42GY2YS3JL5W",
+          "pair": {
+            "address": "CDFKGGP5SRNNNCEAZ4ECGWAQT4O3BU3IUY65VF6QU5MYN4Z5Q7KYELZH",
+            "wasm_hash": "aae8760f5eebdfefa66914cf98e4cf945f9bac4aa8e5613d4e9e2d423a438d8a"
+          }
+        }
+      ],
+      "max_seconds": 300,
+      "max_ledgers": 64
+    },
+    "tokens": [
+      {
+        "address": "CCECTMZ4PJIIHUVCUTGFVOBNJ5WA5JQSCTHJIQCXILMU2WKYWGFNJ45G",
+        "symbol": "MKA",
+        "decimals": 7
+      },
+      {
+        "address": "CBNVWZ5GBPOEISLJDBIVZS5MQASTX3ZK773CGXYBB2KN42GY2YS3JL5W",
+        "symbol": "MKB",
+        "decimals": 7
+      },
+      {
+        "address": "CDARIATHAO4DTSGHZDQQQRH7HUO6O2DOOVOCVYIIL4DXVFG3GXN6VTDR",
+        "symbol": "MKOUT",
+        "decimals": 7
+      }
+    ],
+    "vaultName": "Mierkhat testnet fixture",
+    "shareDecimals": 7,
+    "feeCeilingStroops": "10000000"
+  }
+]
