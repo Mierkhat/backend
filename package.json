@@ -1,0 +1,6 @@
+{
+ "name":"@mierkhat/backend","version":"0.1.0","private":true,"type":"module",
+ "scripts":{"typecheck":"tsc --noEmit","build":"tsc","dev":"tsx watch src/server.ts","start":"node dist/server.js","test":"vitest run","test:integration":"vitest run --config vitest.integration.config.ts","migrate":"tsx src/migrate.ts"},
+ "dependencies":{"@mierkhat/sdk":"workspace:^0.1.0","@fastify/cors":"11.2.0","@fastify/rate-limit":"10.3.0","fastify":"5.12.7","zod":"4.6.7","pg":"8.23.1"},
+ "devDependencies":{"@types/node":"24.10.0","@types/pg":"8.15.5","tsx":"4.20.6","typescript":"7.0.2","vitest":"5.0.5"}
+}
