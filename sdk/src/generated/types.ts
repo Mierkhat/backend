@@ -1,16 +1,14 @@
 // Generated from compiled guard ABI. Do not edit.
-import type {u32,u64,i128,Option} from "@stellar/stellar-sdk/contract";
+import type { u32, u64, i128, Option } from "@stellar/stellar-sdk/contract";
 export interface CodePin {
   address: string;
   wasm_hash: Uint8Array;
 }
 
-
 export interface AssetRoute {
   asset: string;
   pair: Array<CodePin>;
 }
-
 
 export interface ExitIntent {
   guard: string;
@@ -28,7 +26,6 @@ export interface ExitIntent {
   valid_before_time: u64;
 }
 
-
 export interface ExitReceipt {
   intent_hash: Uint8Array;
   intent_id: Uint8Array;
@@ -42,7 +39,6 @@ export interface ExitReceipt {
   withdrawn: Array<i128>;
 }
 
-
 export interface RouteProfile {
   assets: Array<AssetRoute>;
   factory: CodePin;
@@ -54,4 +50,3 @@ export interface RouteProfile {
   settlement: string;
   vault: CodePin;
 }
-

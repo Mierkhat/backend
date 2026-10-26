@@ -11,15 +11,8 @@
     "resolveJsonModule": true,
     "esModuleInterop": true,
     "noUncheckedIndexedAccess": true,
-    "types": [
-      "node"
-    ]
+    "types": ["node"]
   },
-  "include": [
-    "src"
-  ],
-  "exclude": [
-    "src/**/*.test.ts",
-    "src/test-fixture.ts"
-  ]
+  "include": ["src"],
+  "exclude": ["src/**/*.test.ts", "src/test-fixture.ts"]
 }

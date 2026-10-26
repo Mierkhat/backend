@@ -75,14 +75,8 @@
       "owner": "GCAVTARGBNDGUCVBMXE2RU5OW5TBJZANS3UDPTMGDAECA3XYHGY77T5C",
       "recipient": "GCAVTARGBNDGUCVBMXE2RU5OW5TBJZANS3UDPTMGDAECA3XYHGY77T5C",
       "shares": "1000000000",
-      "min_withdraw": [
-        "1",
-        "1"
-      ],
-      "min_swap": [
-        "1",
-        "1"
-      ],
+      "min_withdraw": ["1", "1"],
+      "min_swap": ["1", "1"],
       "min_receive": "1",
       "valid_before_time": "1793023937",
       "valid_before_ledger": 5400070

@@ -1,22 +1,74 @@
-import { readFile } from 'node:fs/promises';
-import { Pool } from 'pg';
-import { bundleSchema } from '@mierkhat/sdk';
-import { createApp } from './app.js';
-import { Store } from './store.js';
-import { Providers } from './providers.js';
-import { reconcileOne } from './worker.js';
-const databaseUrl=process.env.DATABASE_URL;
-const payloadKey=process.env.PAYLOAD_KEY;
-if(!databaseUrl||!payloadKey||!/^[0-9a-f]{64}$/.test(payloadKey))throw Error('Set DATABASE_URL and PAYLOAD_KEY (32 byte hex) in the server environment');
-const bundles=(JSON.parse(await readFile(process.env.DEPLOYMENT_REGISTRY??new URL('../sdk/deployments/index.json',import.meta.url),'utf8')) as unknown[]).map(v=>bundleSchema.parse(v));
-const endpoints:Record<string,string[]>={testnet:(process.env.TESTNET_RPC_URLS??'https://soroban-testnet.stellar.org').split(','),local:(process.env.LOCAL_RPC_URLS??'http://127.0.0.1:8000/soroban/rpc').split(',')};
-const networks=Object.fromEntries(bundles.map(b=>[b.environment,b.networkPassphrase]));
-const pool=new Pool({connectionString:databaseUrl,max:10,connectionTimeoutMillis:5000,statement_timeout:10000});
-const store=new Store(pool,Buffer.from(payloadKey,'hex'));await store.migrate();
-const providers=new Providers(endpoints,networks);
-const app=await createApp({store,providers,bundles,origins:(process.env.ALLOWED_ORIGINS??'http://localhost:5173').split(',')});
-let stopping=false;let active:Promise<unknown>|undefined;
-const timer=setInterval(()=>{if(stopping||active)return;active=reconcileOne(store,providers,bundles).catch(()=>{}).finally(()=>{active=undefined;});},1000);
-const prune=setInterval(()=>{void store.prune().catch(()=>{});},60000);
-await app.listen({host:process.env.HOST??'127.0.0.1',port:Number(process.env.PORT??3001)});
-for(const signal of ['SIGINT','SIGTERM'])process.once(signal,async()=>{stopping=true;clearInterval(timer);clearInterval(prune);await active;await app.close();await pool.end();});
+import { readFile } from "node:fs/promises";
+import { Pool } from "pg";
+import { bundleSchema } from "@mierkhat/sdk";
+import { createApp } from "./app.js";
+import { Store } from "./store.js";
+import { Providers } from "./providers.js";
+import { reconcileOne } from "./worker.js";
+const databaseUrl = process.env.DATABASE_URL;
+const payloadKey = process.env.PAYLOAD_KEY;
+if (!databaseUrl || !payloadKey || !/^[0-9a-f]{64}$/.test(payloadKey))
+  throw Error(
+    "Set DATABASE_URL and PAYLOAD_KEY (32 byte hex) in the server environment",
+  );
+const bundles = (
+  JSON.parse(
+    await readFile(
+      process.env.DEPLOYMENT_REGISTRY ??
+        new URL("../sdk/deployments/index.json", import.meta.url),
+      "utf8",
+    ),
+  ) as unknown[]
+).map((v) => bundleSchema.parse(v));
+const endpoints: Record<string, string[]> = {
+  testnet: (
+    process.env.TESTNET_RPC_URLS ?? "https://soroban-testnet.stellar.org"
+  ).split(","),
+  local: (
+    process.env.LOCAL_RPC_URLS ?? "http://127.0.0.1:8000/soroban/rpc"
+  ).split(","),
+};
+const networks = Object.fromEntries(
+  bundles.map((b) => [b.environment, b.networkPassphrase]),
+);
+const pool = new Pool({
+  connectionString: databaseUrl,
+  max: 10,
+  connectionTimeoutMillis: 5000,
+  statement_timeout: 10000,
+});
+const store = new Store(pool, Buffer.from(payloadKey, "hex"));
+await store.migrate();
+const providers = new Providers(endpoints, networks);
+const app = await createApp({
+  store,
+  providers,
+  bundles,
+  origins: (process.env.ALLOWED_ORIGINS ?? "http://localhost:5173").split(","),
+});
+let stopping = false;
+let active: Promise<unknown> | undefined;
+const timer = setInterval(() => {
+  if (stopping || active) return;
+  active = reconcileOne(store, providers, bundles)
+    .catch(() => {})
+    .finally(() => {
+      active = undefined;
+    });
+}, 1000);
+const prune = setInterval(() => {
+  void store.prune().catch(() => {});
+}, 60000);
+await app.listen({
+  host: process.env.HOST ?? "127.0.0.1",
+  port: Number(process.env.PORT ?? 3001),
+});
+for (const signal of ["SIGINT", "SIGTERM"])
+  process.once(signal, async () => {
+    stopping = true;
+    clearInterval(timer);
+    clearInterval(prune);
+    await active;
+    await app.close();
+    await pool.end();
+  });
