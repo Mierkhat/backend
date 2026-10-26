@@ -224,6 +224,13 @@ export class Store {
       client.release();
     }
   }
+  async renewLease(row: AttemptRow, workerId: string): Promise<boolean> {
+    const result = await this.pool.query(
+      `UPDATE worker_leases l SET lease_until=now()+interval '30 seconds' WHERE l.environment=$1 AND l.tx_hash=$2 AND l.worker_id=$3 AND l.lease_until>now() AND EXISTS(SELECT 1 FROM attempts a WHERE a.environment=$1 AND a.tx_hash=$2 AND a.version=$4 AND a.state NOT IN ('succeeded','failed'))`,
+      [row.environment, row.tx_hash, workerId, row.version],
+    );
+    return !!result.rowCount;
+  }
   async update(
     row: AttemptRow,
     observation: Observation,

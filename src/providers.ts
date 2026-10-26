@@ -41,7 +41,10 @@ export class Providers {
         this.failures.delete(url);
         return result;
       } catch (error) {
-        if (error instanceof MierkhatError) throw error;
+        if (error instanceof MierkhatError) {
+          this.failures.delete(url);
+          throw error;
+        }
         state.count++;
         state.probing = false;
         if (state.count >= 5) state.until = Date.now() + 30000;

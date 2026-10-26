@@ -53,6 +53,28 @@ describe("R03/R15 envelope policy", () => {
     const a = verifySigned(f.tx.toXDR(), f.review, f.bundle);
     expect(a.txHash).toBe(hex(f.tx.hash()));
     expect(a.signedEnvelopeDigest).not.toBe(f.review.envelopeDigest);
+    const wrongHint = f.key
+      .signatureHint()
+      .map((v, n) => (n === 0 ? v ^ 255 : v));
+    const envelope = f.tx.toEnvelope();
+    if (envelope.type !== "envelopeTypeTx") throw Error("fixture");
+    const altered = new Transaction(
+      xdr.TransactionEnvelope.envelopeTypeTx(
+        new xdr.TransactionV1Envelope({
+          tx: envelope.v1.tx,
+          signatures: [
+            new xdr.DecoratedSignature({
+              hint: wrongHint,
+              signature: f.tx.signatures[0]!.signature,
+            }),
+          ],
+        }),
+      ),
+      f.bundle.networkPassphrase,
+    );
+    expect(() => verifySigned(altered.toXDR(), f.review, f.bundle)).toThrow(
+      "Signature",
+    );
   });
   it("rejects fee/source/sequence/resources/operation mutation from wallet", () => {
     const f = sdkFixture();

@@ -1,3 +1,4 @@
+import { MierkhatError } from "./amount.js";
 import { Transaction, xdr } from "@stellar/stellar-sdk";
 import {
   decodeEnvelope,
@@ -26,7 +27,7 @@ export function inspectSigned(
     op.func.type !== "hostFunctionTypeInvokeContract" ||
     op.func.invokeContract.args.length !== 1
   )
-    throw Error("UnsupportedEnvelope");
+    throw new MierkhatError("UnsupportedEnvelope", "failure.authority");
   const native = spec.scValToNative(
     op.func.invokeContract.args[0]!,
     xdr.ScSpecTypeDef.scSpecTypeUdt(

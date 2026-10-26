@@ -67,6 +67,15 @@ export async function createApp(options: {
       .header("X-Robots-Tag", "noindex, nofollow");
   });
   app.setErrorHandler((error, req, reply) => {
+    const clientStatus =
+      typeof error === "object" &&
+      error !== null &&
+      "statusCode" in error &&
+      typeof error.statusCode === "number" &&
+      error.statusCode >= 400 &&
+      error.statusCode < 500
+        ? error.statusCode
+        : undefined;
     const status =
       error instanceof Conflict
         ? 409
@@ -74,19 +83,14 @@ export async function createApp(options: {
           ? 400
           : error instanceof MierkhatError
             ? 422
-            : typeof error === "object" &&
-                error !== null &&
-                "statusCode" in error &&
-                error.statusCode === 429
-              ? 429
-              : 503;
+            : (clientStatus ?? 503);
     reply.code(status).send({
       code:
         error instanceof MierkhatError
           ? error.code
           : status === 409
             ? "Conflict"
-            : status === 400
+            : status >= 400 && status < 500 && status !== 429
               ? "InvalidRequest"
               : status === 429
                 ? "RateLimited"
@@ -94,7 +98,7 @@ export async function createApp(options: {
       copyKey:
         error instanceof MierkhatError
           ? error.copyKey
-          : status === 400
+          : status >= 400 && status < 500 && status !== 429
             ? "input.invalid"
             : "service.unavailable",
       retryable: status >= 500 || status === 429,

@@ -1,5 +1,5 @@
 import { afterEach, it, expect, vi } from "vitest";
-import { rpc } from "@mierkhat/sdk";
+import { rpc, MierkhatError } from "@mierkhat/sdk";
 import { Providers } from "./providers.js";
 afterEach(() => vi.restoreAllMocks());
 it("rejects environments without configured providers without invoking caller work", async () => {
@@ -53,4 +53,33 @@ it("does not let a stale ledger reach construction", async () => {
     }),
   ).rejects.toThrow("ProvidersUnavailable");
   expect(calls).toBe(0);
+});
+
+it("a rejected action on the half-open probe does not strand a healthy provider", async () => {
+  const now = vi.spyOn(Date, "now").mockReturnValue(1000000);
+  const network = vi
+    .spyOn(rpc.Server.prototype, "getNetwork")
+    .mockRejectedValue(new Error("offline"));
+  const providers = new Providers(
+    { testnet: ["https://first.example"] },
+    { testnet: "expected" },
+  );
+  for (let n = 0; n < 5; n++)
+    await expect(providers.run("testnet", async () => 1)).rejects.toThrow(
+      "ProvidersUnavailable",
+    );
+  now.mockReturnValue(1031000);
+  network.mockResolvedValue({ passphrase: "expected", protocolVersion: "29" });
+  vi.spyOn(rpc.Server.prototype, "getLatestLedger").mockResolvedValue({
+    sequence: 100,
+    closeTime: "1031",
+  } as Awaited<ReturnType<rpc.Server["getLatestLedger"]>>);
+  await expect(
+    providers.run("testnet", async () => {
+      throw new MierkhatError("SimulationRejected", "route.unsupported");
+    }),
+  ).rejects.toThrow("SimulationRejected");
+  expect(await providers.run("testnet", async () => "recovered")).toBe(
+    "recovered",
+  );
 });

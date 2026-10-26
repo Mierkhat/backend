@@ -161,6 +161,18 @@ describe("R04/R06/R07 durable PostgreSQL tracking", () => {
     expect(row?.tx_hash).toBe(a.txHash);
     expect(row?.encrypted).toBeNull();
   });
+  it("renews only the current live lease and never revives an expired owner", async () => {
+    const { a } = attempt();
+    await store.record(a, "renew-lease-attempt-0001");
+    const worker = randomUUID();
+    const row = (await store.claim(worker))!;
+    expect(await store.renewLease(row, randomUUID())).toBe(false);
+    expect(await store.renewLease(row, worker)).toBe(true);
+    await pool.query(
+      "UPDATE worker_leases SET lease_until=now()-interval '1 second'",
+    );
+    expect(await store.renewLease(row, worker)).toBe(false);
+  });
   it("persists unsigned reviews and handles expired/wrong-environment lookup", async () => {
     const { f } = attempt();
     const saved = await store.saveReview(f.review);
@@ -199,6 +211,21 @@ describe("R04/R06/R07 durable PostgreSQL tracking", () => {
         payload: { signedXdr: "bad" },
       });
       expect(invalid.statusCode).toBe(400);
+      const malformed = await app.inject({
+        method: "POST",
+        url: "/v1/exit/submit",
+        headers: { "content-type": "application/json" },
+        payload: "{broken",
+      });
+      expect(malformed.statusCode).toBe(400);
+      const large = await app.inject({
+        method: "POST",
+        url: "/v1/exit/submit",
+        headers: { "content-type": "application/json" },
+        payload: JSON.stringify({ data: "x".repeat(262144) }),
+      });
+      expect(large.statusCode).toBe(413);
+
       expect(invalid.body).not.toContain("stack");
     } finally {
       await app.close();

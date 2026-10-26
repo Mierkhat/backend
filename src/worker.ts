@@ -16,6 +16,17 @@ export async function reconcileOne(
 ): Promise<boolean> {
   const row = await store.claim(workerId);
   if (!row) return false;
+  let renewing = false;
+  const heartbeat = setInterval(() => {
+    if (renewing) return;
+    renewing = true;
+    void store
+      .renewLease(row, workerId)
+      .catch(() => false)
+      .finally(() => {
+        renewing = false;
+      });
+  }, 10000);
   const bundle = bundles.find(
     (b) => b.environment === row.environment && b.epoch === row.epoch,
   );
@@ -60,6 +71,7 @@ export async function reconcileOne(
   } catch {
     /* Unavailability is an observation, never confirmed failure. */
   }
+  clearInterval(heartbeat);
   await store.update(row, observation, workerId);
   return true;
 }

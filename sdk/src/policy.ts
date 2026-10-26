@@ -8,6 +8,7 @@ import {
 import { MierkhatError, rawAmount } from "./amount.js";
 import {
   digest,
+  hex,
   intentHash,
   intentScVal,
   networkId,
@@ -131,7 +132,12 @@ export function decodeEnvelope(
     xdrText.length <= 350000 && /^[A-Za-z0-9+/]+={0,2}$/.test(xdrText),
     "BadEnvelope",
   );
-  const tx = TransactionBuilder.fromXDR(xdrText, passphrase);
+  let tx: ReturnType<typeof TransactionBuilder.fromXDR>;
+  try {
+    tx = TransactionBuilder.fromXDR(xdrText, passphrase);
+  } catch {
+    throw new MierkhatError("BadEnvelope", "failure.authority");
+  }
   assert(
     tx instanceof Transaction && tx.toEnvelope().type === "envelopeTypeTx",
     "UnsupportedEnvelope",
@@ -320,12 +326,19 @@ export function verifySigned(
     "failure.authority",
   );
   const key = Keypair.fromPublicKey(review.draft.intent.owner);
+  assert(signed.signatures.length === 1, "Signature", "failure.authority");
+  const signature = signed.signatures[0]!;
   assert(
-    signed.signatures.length === 1 &&
-      key.verify(signed.hash(), signed.signatures[0]!.signature.toBytes()),
+    signature.signature.toBytes().length === 64 &&
+      hex(signature.hint.toBytes()) === hex(key.signatureHint()),
     "Signature",
     "failure.authority",
   );
+  let valid = false;
+  try {
+    valid = key.verify(signed.hash(), signature.signature.toBytes());
+  } catch {}
+  assert(valid, "Signature", "failure.authority");
   return {
     environment: b.environment,
     epoch: b.epoch,
