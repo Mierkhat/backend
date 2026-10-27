@@ -21,17 +21,28 @@ import type { Store } from "./store.js";
 import type { Providers } from "./providers.js";
 import { Conflict } from "./store.js";
 export class SetupService {
+  private bundles: DeploymentBundle[];
+  private get bundle() {
+    return this.bundles[0]!;
+  }
   constructor(
     private store: Store,
     private providers: Providers,
-    private bundle: DeploymentBundle,
+    bundle: DeploymentBundle | DeploymentBundle[],
     private issuer?: Keypair,
-  ) {}
+  ) {
+    this.bundles = Array.isArray(bundle) ? bundle : [bundle];
+    assert(this.bundles.length, "UnsupportedDeployment");
+  }
   async record(bytes: string, review: SetupReview): Promise<string> {
+    const bundle = this.bundles.find(
+      (b) => b.epoch === review.epoch && b.environment === review.environment,
+    );
+    assert(bundle, "UnsupportedDeployment", "route.unsupported");
     const { hash, digest: signedDigest } = verifySetupSigned(
       bytes,
       review,
-      this.bundle,
+      bundle,
     );
     const inserted = await this.store.pool.query(
       `INSERT INTO setup_jobs(tx_hash,owner,kind,epoch,signed_digest,encrypted,review) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT DO NOTHING`,
@@ -39,7 +50,7 @@ export class SetupService {
         hash,
         review.draft.owner,
         review.draft.kind,
-        this.bundle.epoch,
+        bundle.epoch,
         signedDigest,
         this.store.seal(bytes, "setup:" + hash),
         review,
@@ -59,9 +70,14 @@ export class SetupService {
   }
   async faucet(
     owner: string,
+    epoch?: string,
   ): Promise<{ hash: string; amounts: { symbol: string; amount: string }[] }> {
+    const bundle = epoch
+      ? this.bundles.find((b) => b.epoch === epoch)
+      : this.bundle;
+    assert(bundle, "UnsupportedDeployment", "route.unsupported");
     assert(
-      this.issuer && this.bundle.environment === "testnet",
+      this.issuer && bundle.environment === "testnet",
       "FaucetUnavailable",
       "faucet.unavailable",
     );
@@ -70,18 +86,22 @@ export class SetupService {
       await c.query("SELECT pg_advisory_lock(742815)");
       const previous = (
         await c.query(
-          `SELECT tx_hash FROM setup_jobs WHERE kind='faucet' AND owner=$1 AND created_at>now()-interval '24 hours' AND state<>'failed' ORDER BY created_at DESC LIMIT 1`,
+          `SELECT tx_hash,review FROM setup_jobs WHERE kind='faucet' AND owner=$1 AND created_at>now()-interval '24 hours' AND state<>'failed' ORDER BY created_at DESC`,
           [owner],
         )
-      ).rows[0];
-      if (previous)
-        return {
-          hash: previous.tx_hash,
-          amounts: this.bundle.tokens.map((t) => ({
-            symbol: t.symbol,
-            amount: "1000",
-          })),
-        };
+      ).rows;
+      // Older grants issued every original token; new grants record exact assets.
+      const granted = new Set<string>(
+        previous.flatMap(
+          (row) =>
+            row.review?.faucetAssets ??
+            this.bundle.tokens.map((token) => token.address),
+        ),
+      );
+      const tokens = bundle.tokens.filter(
+        (token) => !granted.has(token.address),
+      );
+      if (!tokens.length) return { hash: previous[0]!.tx_hash, amounts: [] };
       const unresolved = await c.query(
         `SELECT 1 FROM setup_jobs WHERE kind='faucet' AND state NOT IN ('succeeded','failed') AND created_at>now()-interval '5 minutes' LIMIT 1`,
       );
@@ -91,7 +111,7 @@ export class SetupService {
       );
       assert(daily.rows[0].n < 100, "FaucetLimit", "faucet.limit");
       const bytes = await this.providers.run("testnet", async (s) => {
-        const a = await accountState(this.bundle, s, owner);
+        const a = await accountState(bundle, s, owner);
         assert(
           a.funded && a.tokens.every((t) => t.trusted),
           "TrustRequired",
@@ -99,9 +119,14 @@ export class SetupService {
         );
         const tx = new TransactionBuilder(
           await s.getAccount(this.issuer!.publicKey()),
-          { fee: "3000", networkPassphrase: this.bundle.networkPassphrase },
+          { fee: "3000", networkPassphrase: bundle.networkPassphrase },
         ).setTimeout(180);
-        for (const asset of stellarAssets(this.bundle)) {
+        for (const asset of stellarAssets(bundle).filter((asset) =>
+          tokens.some(
+            (token) =>
+              token.address === asset.contractId(bundle.networkPassphrase),
+          ),
+        )) {
           assert(asset.issuer === this.issuer!.publicKey(), "FaucetIssuer");
           tx.addOperation(
             Operation.payment({ destination: owner, asset, amount: "1000" }),
@@ -111,21 +136,22 @@ export class SetupService {
         built.sign(this.issuer!);
         return built.toXDR();
       });
-      const tx = decodeEnvelope(bytes, this.bundle.networkPassphrase),
+      const tx = decodeEnvelope(bytes, bundle.networkPassphrase),
         hash = hex(tx.hash());
       await c.query(
-        `INSERT INTO setup_jobs(tx_hash,owner,kind,epoch,signed_digest,encrypted) VALUES($1,$2,'faucet',$3,$4,$5)`,
+        `INSERT INTO setup_jobs(tx_hash,owner,kind,epoch,signed_digest,encrypted,review) VALUES($1,$2,'faucet',$3,$4,$5,$6)`,
         [
           hash,
           owner,
-          this.bundle.epoch,
+          bundle.epoch,
           digest(tx.toEnvelope().toXDR()),
           this.store.seal(bytes, "setup:" + hash),
+          { faucetAssets: tokens.map((token) => token.address) },
         ],
       );
       return {
         hash,
-        amounts: this.bundle.tokens.map((t) => ({
+        amounts: tokens.map((t) => ({
           symbol: t.symbol,
           amount: "1000",
         })),

@@ -67,6 +67,62 @@ export interface AccountState {
   }[];
   ledger: number;
 }
+export interface VaultPosition {
+  vault: string;
+  vaultName: string;
+  shareDecimals: number;
+  sharesRaw: string;
+  routeEpochs: string[];
+}
+export interface PositionsState {
+  owner: string;
+  ledger: number;
+  positions: VaultPosition[];
+}
+// Shares are fungible within a vault. Output routes must not duplicate a holding.
+export async function accountPositions(
+  bundles: DeploymentBundle[],
+  server: rpc.Server,
+  owner: string,
+): Promise<PositionsState> {
+  const first = bundles[0];
+  assert(first, "UnsupportedDeployment", "route.unsupported");
+  const account = await accountState(first, server, owner);
+  if (!account.funded) return { owner, ledger: account.ledger, positions: [] };
+  const vaults = new Map<string, DeploymentBundle[]>();
+  for (const b of bundles) {
+    validateBundle(b);
+    assert(b.networkPassphrase === first.networkPassphrase, "PositionNetwork");
+    const group = vaults.get(b.profile.vault.address) ?? [];
+    group.push(b);
+    vaults.set(b.profile.vault.address, group);
+  }
+  const positions: VaultPosition[] = [];
+  // One read per distinct vault. A failed read is never represented as zero.
+  for (const [vault, routes] of vaults) {
+    const b = routes[0]!;
+    const sharesRaw =
+      vault === first.profile.vault.address
+        ? account.sharesRaw!
+        : String(
+            scValToNative(
+              await readContract(server, b, owner, vault, "balance", [
+                Address.fromString(owner).toScVal(),
+              ]),
+            ),
+          );
+    rawAmount(sharesRaw, false);
+    if (BigInt(sharesRaw) > 0n)
+      positions.push({
+        vault,
+        vaultName: b.vaultName,
+        shareDecimals: b.shareDecimals,
+        sharesRaw,
+        routeEpochs: routes.map((route) => route.epoch),
+      });
+  }
+  return { owner, ledger: account.ledger, positions };
+}
 export async function accountState(
   b: DeploymentBundle,
   s: rpc.Server,

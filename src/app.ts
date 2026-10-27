@@ -5,6 +5,7 @@ import { z } from "zod";
 import {
   MierkhatError,
   accountState,
+  accountPositions,
   networkState,
   quoteExit,
   prepareSetup,
@@ -13,6 +14,7 @@ import {
   accountSchema,
   assert,
   decodeReceipt,
+  decodeKnownReceipt,
   environmentSchema,
   hashSchema,
   inspectSigned,
@@ -71,8 +73,10 @@ const setupSubmitSchema = z
   .object({ signedXdr: z.string().max(349528), review: setupReviewSchema })
   .strict();
 const ownerBody = z.object({ owner: accountSchema }).strict();
+const routeEpoch = z.string().min(1).max(80).optional();
+const setupPrepareBody = setupDraft.extend({ epoch: routeEpoch });
 const quoteBody = z
-  .object({ owner: accountSchema, shares: amountSchema })
+  .object({ owner: accountSchema, shares: amountSchema, epoch: routeEpoch })
   .strict();
 const jsonBody = (schema: z.ZodType) => ({
   required: true,
@@ -182,7 +186,25 @@ export async function createApp(options: {
           responses: {
             "200": {
               description:
-                "Actual account funding, trustline, asset and vault share state",
+                "Actual account funding, trustline, asset and selected vault share state (optional epoch query)",
+            },
+          },
+        },
+      },
+      "/v1/accounts/{owner}/positions": {
+        get: {
+          parameters: [
+            {
+              in: "path",
+              name: "owner",
+              required: true,
+              schema: z.toJSONSchema(accountSchema),
+            },
+          ],
+          responses: {
+            "200": {
+              description:
+                "Actual positive share balances, grouped once per supported vault with its pinned output routes",
             },
           },
         },
@@ -200,7 +222,7 @@ export async function createApp(options: {
       },
       "/v1/setup/prepare": {
         post: {
-          requestBody: jsonBody(setupDraft),
+          requestBody: jsonBody(setupPrepareBody),
           responses: {
             "200": {
               description:
@@ -230,7 +252,7 @@ export async function createApp(options: {
       },
       "/v1/testnet/faucet": {
         post: {
-          requestBody: jsonBody(ownerBody),
+          requestBody: jsonBody(ownerBody.extend({ epoch: routeEpoch })),
           responses: {
             "202": {
               description:
@@ -405,18 +427,31 @@ export async function createApp(options: {
   });
   app.get("/v1/accounts/:owner", async (req) => {
     const { owner } = z.object({ owner: accountSchema }).parse(req.params);
-    return providers.run("testnet", (s) => accountState(testnet(), s, owner));
+    const { epoch } = z
+      .object({ epoch: z.string().min(1).max(80).optional() })
+      .strict()
+      .parse(req.query);
+    const selected = bundle("testnet", epoch);
+    return providers.run("testnet", (s) => accountState(selected, s, owner));
+  });
+  app.get("/v1/accounts/:owner/positions", async (req) => {
+    const { owner } = z.object({ owner: accountSchema }).parse(req.params);
+    return providers.run("testnet", (s) =>
+      accountPositions(
+        bundles.filter((b) => b.environment === "testnet"),
+        s,
+        owner,
+      ),
+    );
   });
   app.post(
     "/v1/exit/quote",
     { config: { rateLimit: { max: 30, timeWindow: "1 minute" } } },
     async (req) => {
-      const body = z
-        .object({ owner: accountSchema, shares: amountSchema })
-        .strict()
-        .parse(req.body);
+      const body = quoteBody.parse(req.body);
+      const selected = bundle("testnet", body.epoch);
       return providers.run("testnet", (s) =>
-        quoteExit(testnet(), s, body.owner, body.shares),
+        quoteExit(selected, s, body.owner, body.shares),
       );
     },
   );
@@ -424,8 +459,9 @@ export async function createApp(options: {
     "/v1/setup/prepare",
     { config: { rateLimit: { max: 15, timeWindow: "1 minute" } } },
     async (req) => {
-      const d = setupDraft.parse(req.body);
-      return providers.run("testnet", (s) => prepareSetup(d, testnet(), s));
+      const { epoch, ...d } = setupPrepareBody.parse(req.body);
+      const selected = bundle("testnet", epoch);
+      return providers.run("testnet", (s) => prepareSetup(d, selected, s));
     },
   );
   app.post("/v1/setup/submit", async (req, reply) => {
@@ -439,11 +475,11 @@ export async function createApp(options: {
     { config: { rateLimit: { max: 5, timeWindow: "1 minute" } } },
     async (req, reply) => {
       assert(options.setup, "SetupUnavailable");
-      const { owner } = z
-        .object({ owner: accountSchema })
+      const { owner, epoch } = z
+        .object({ owner: accountSchema, epoch: routeEpoch })
         .strict()
         .parse(req.body);
-      return reply.code(202).send(await options.setup.faucet(owner));
+      return reply.code(202).send(await options.setup.faucet(owner, epoch));
     },
   );
   app.post(
@@ -562,7 +598,15 @@ export async function createApp(options: {
       return row.observation;
     const b = bundle(q.environment, row?.epoch, true);
     const observation = await providers.run(q.environment, (server) =>
-      decodeReceipt(server, b, p.hash),
+      row
+        ? decodeReceipt(server, b, p.hash)
+        : decodeKnownReceipt(
+            server,
+            knownBundles.filter(
+              (candidate) => candidate.environment === q.environment,
+            ),
+            p.hash,
+          ),
     );
     if (row) await store.update(row, observation);
     return observation;

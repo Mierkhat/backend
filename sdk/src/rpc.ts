@@ -287,7 +287,23 @@ export async function decodeReceipt(
   bundle: DeploymentBundle,
   hash: string,
 ): Promise<Observation> {
-  const b = validateBundle(bundle, "read");
+  return decodeKnownReceipt(server, [bundle], hash);
+}
+// Select from trusted pins using the actual root invocation, never a UI label.
+export async function decodeKnownReceipt(
+  server: rpc.Server,
+  bundles: DeploymentBundle[],
+  hash: string,
+): Promise<Observation> {
+  const candidates = bundles.map((bundle) => validateBundle(bundle, "read"));
+  let b = candidates[0];
+  assert(b, "UnsupportedDeployment");
+  assert(
+    candidates.every(
+      (candidate) => candidate.networkPassphrase === b!.networkPassphrase,
+    ),
+    "LookupNetwork",
+  );
   const result = await server.getTransaction(hash);
   const base = {
     hash,
@@ -303,6 +319,16 @@ export async function decodeReceipt(
     b.networkPassphrase,
   );
   assert(hex(tx.hash()) === hash, "LookupHash");
+  const root = tx.operations[0];
+  if (
+    root?.type === "invokeHostFunction" &&
+    root.func.type === "hostFunctionTypeInvokeContract"
+  ) {
+    const address = Address.fromScAddress(
+      root.func.invokeContract.contractAddress,
+    ).toString();
+    b = candidates.find((candidate) => candidate.guard === address) ?? b;
+  }
   if (result.status === rpc.Api.GetTransactionStatus.FAILED)
     return {
       ...base,

@@ -29,7 +29,27 @@
         ],
         "responses": {
           "200": {
-            "description": "Actual account funding, trustline, asset and vault share state"
+            "description": "Actual account funding, trustline, asset and selected vault share state (optional epoch query)"
+          }
+        }
+      }
+    },
+    "/v1/accounts/{owner}/positions": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "owner",
+            "required": true,
+            "schema": {
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Actual positive share balances, grouped once per supported vault with its pinned output routes"
           }
         }
       }
@@ -51,6 +71,11 @@
                     "type": "string",
                     "maxLength": 39,
                     "pattern": "^(0|[1-9][0-9]*)$"
+                  },
+                  "epoch": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
                   }
                 },
                 "required": [
@@ -115,6 +140,11 @@
                       "type": "string",
                       "maxLength": 56
                     }
+                  },
+                  "epoch": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
                   }
                 },
                 "required": [
@@ -326,6 +356,11 @@
                 "properties": {
                   "owner": {
                     "type": "string"
+                  },
+                  "epoch": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
                   }
                 },
                 "required": [

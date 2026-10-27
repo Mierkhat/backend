@@ -23,7 +23,7 @@ Generate the encryption key with `openssl rand -hex 32`. Back it up securely wit
 
 ## Testnet issuer
 
-Configure the real issuer matching the pinned assets. No key is shipped; missing configuration disables issuance. The faucet serializes the issuer sequence, makes actual classic asset payments, allows one allocation per account per 24 hours and enforces a daily global cap. Friendbot native funding is separate. Never configure a personal wallet as the issuer.
+Configure the real issuer matching the pinned assets. No key is shipped; missing configuration disables issuance. The faucet serializes the issuer sequence, makes actual classic asset payments, allows one allocation of each configured token per account per 24 hours and enforces a daily global cap. Friendbot native funding is separate. Never configure a personal wallet as the issuer.
 
 ## Hosting
 

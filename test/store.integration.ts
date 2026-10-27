@@ -236,6 +236,64 @@ describe("R04/R06/R07 durable PostgreSQL tracking", () => {
   });
 });
 
+describe("route selection boundaries", () => {
+  it("rejects an unknown route before contacting providers or preparing anything", async () => {
+    const bundle = bundleSchema.parse(registry[0]);
+    const app = await createApp({
+      store,
+      providers: new Providers({}, {}),
+      bundles: [bundle],
+      origins: [],
+    });
+    const owner = actualSetup[0]!.review.draft.owner;
+    try {
+      for (const request of [
+        {
+          method: "GET" as const,
+          url: "/v1/accounts/" + owner + "?epoch=unregistered-route",
+        },
+        {
+          method: "POST" as const,
+          url: "/v1/exit/quote",
+          payload: { owner, shares: "1", epoch: "unregistered-route" },
+        },
+        {
+          method: "POST" as const,
+          url: "/v1/setup/prepare",
+          payload: {
+            ...actualSetup[0]!.review.draft,
+            epoch: "unregistered-route",
+          },
+        },
+      ]) {
+        const response = await app.inject(request);
+        expect(response.statusCode).toBe(422);
+        expect(response.json().code).toBe("UnsupportedDeployment");
+      }
+      expect((await pool.query("SELECT 1 FROM reviews")).rowCount).toBe(0);
+      expect((await pool.query("SELECT 1 FROM setup_jobs")).rowCount).toBe(0);
+    } finally {
+      await app.close();
+    }
+  });
+  it("verifies a signed setup against its own epoch even when another route is first", async () => {
+    const bundles = registry.map((b) => bundleSchema.parse(b)).reverse();
+    const providers = new Providers({}, {});
+    const service = new SetupService(store, providers, bundles);
+    const actual = actualSetup.find((a) => a.review.draft.kind === "deposit")!;
+    expect(
+      await service.record(actual.signedXdr, actual.review as SetupReview),
+    ).toBe(actual.hash);
+    const row = (await pool.query("SELECT epoch FROM setup_jobs")).rows[0];
+    expect(row.epoch).toBe(actual.review.epoch);
+    const altered = structuredClone(actual.review) as SetupReview;
+    altered.epoch = "unregistered-route";
+    await expect(service.record(actual.signedXdr, altered)).rejects.toThrow(
+      "UnsupportedDeployment",
+    );
+  });
+});
+
 describe("real PostgreSQL setup job durability", () => {
   it("commits encrypted exact setup bytes before submission and deduplicates concurrent records", async () => {
     const bundle = bundleSchema.parse(registry[0]),

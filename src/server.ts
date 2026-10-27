@@ -53,7 +53,12 @@ const liveBundle = bundles.find(
   (b) => b.environment === "testnet" && b.enabled,
 );
 const setup = liveBundle
-  ? new SetupService(store, providers, liveBundle, issuer)
+  ? new SetupService(
+      store,
+      providers,
+      bundles.filter((b) => b.environment === "testnet" && b.enabled),
+      issuer,
+    )
   : undefined;
 const app = await createApp({
   setup,
