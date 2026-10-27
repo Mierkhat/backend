@@ -66,7 +66,9 @@ The server reads `.env` and serializes migrations with an advisory lock. See [op
 ```sh
 pnpm build
 pnpm typecheck
+pnpm typecheck:scripts
 pnpm --filter @mierkhat/sdk typecheck
+pnpm --filter @mierkhat/sdk typecheck:scripts
 pnpm test                         # 4 provider tests
 pnpm --filter @mierkhat/sdk test   # 34 SDK tests
 pnpm test:integration             # 10 real PostgreSQL tests

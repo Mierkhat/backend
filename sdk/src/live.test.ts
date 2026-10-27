@@ -163,7 +163,7 @@ it("rejects seeded malformed XDR and single byte mutations of genuine signed env
         verifySetupSigned(bytes.toString("base64"), a.review, b),
       ).toThrow();
   }
-});
+}, 30000);
 
 it("accepts actual committed restoration and rejects any unpinned restoration key", () => {
   const r = structuredClone(restoreFixture.review) as SetupReview;

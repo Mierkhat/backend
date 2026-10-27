@@ -16,8 +16,10 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       - run: pnpm typecheck
+      - run: pnpm typecheck:scripts
       - run: pnpm test
       - run: pnpm --filter @mierkhat/sdk typecheck
+      - run: pnpm --filter @mierkhat/sdk typecheck:scripts
       - run: pnpm --filter @mierkhat/sdk test
       - run: pnpm test:integration
       - run: pnpm --filter @mierkhat/sdk check:deployments
