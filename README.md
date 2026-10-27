@@ -39,7 +39,7 @@ curl --fail http://127.0.0.1:3001/v1/health
 curl --fail http://127.0.0.1:3001/v1/openapi.json
 ```
 
-Run the [frontend](https://github.com/Mierkhat/frontend#quick-start) separately. The bundled registry enables one pinned testnet profile. Mainnet is disabled. No real balances or RPC responses are replaced with examples.
+Run the [frontend](https://github.com/Mierkhat/frontend#quick-start) separately. The bundled registry enables six pinned output profiles across two actual testnet vaults. Account positions are grouped once per vault; quote and setup requests can select a route by epoch. Mainnet is disabled. No real balances or RPC responses are replaced with examples.
 
 Account funding uses Friendbot. Issuing configured test tokens additionally requires `TESTNET_FAUCET_KEY_FILE`, pointing to a mode-0600 JSON file containing the dedicated issuer's `admin` secret. Its issuer must match the pinned assets. A fresh clone does not include this credential; without it, issuance reports unavailability. Never use a personal wallet secret for the faucet. Testnet assets have no monetary value.
 
@@ -71,11 +71,11 @@ pnpm --filter @mierkhat/sdk typecheck
 pnpm --filter @mierkhat/sdk typecheck:scripts
 pnpm test                         # 4 provider tests
 pnpm --filter @mierkhat/sdk test   # 34 SDK tests
-pnpm test:integration             # 10 real PostgreSQL tests
+pnpm test:integration             # 13 real PostgreSQL tests
 pnpm --filter @mierkhat/sdk check:deployments
 ```
 
-Integration tests create a temporary real PostgreSQL cluster with a random password, then remove it. They cover encrypted bytes, deduplication, idempotency conflicts, worker leases, terminal updates and expiry. They do not broadcast transactions. Actual testnet acceptance has separate [integration instructions](docs/INTEGRATION.md).
+Integration tests create a temporary real PostgreSQL cluster with a random password, then remove it. They cover encrypted bytes, deduplication, idempotency conflicts, worker leases, terminal updates, expiry, route selection and receipt enrichment. They do not broadcast transactions. Actual testnet acceptance has separate [integration instructions](docs/INTEGRATION.md).
 
 ## Repository layout
 
