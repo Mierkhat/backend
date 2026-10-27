@@ -272,7 +272,7 @@ export class Store {
   }
   async prune(): Promise<void> {
     await this.pool.query(
-      `DELETE FROM signed_payloads WHERE expires_at<=now(); DELETE FROM submission_keys WHERE expires_at<=now(); DELETE FROM reviews WHERE expires_at<now()-interval '24 hours'; DELETE FROM attempts WHERE updated_at<now()-interval '90 days' AND state IN ('succeeded','failed');`,
+      `UPDATE setup_jobs SET encrypted=NULL WHERE encrypted IS NOT NULL AND created_at<now()-interval '24 hours'; DELETE FROM setup_jobs WHERE state IN ('succeeded','failed') AND updated_at<now()-interval '90 days'; DELETE FROM signed_payloads WHERE expires_at<=now(); DELETE FROM submission_keys WHERE expires_at<=now(); DELETE FROM reviews WHERE expires_at<now()-interval '24 hours'; DELETE FROM attempts WHERE updated_at<now()-interval '90 days' AND state IN ('succeeded','failed');`,
     );
   }
 }

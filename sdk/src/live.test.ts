@@ -78,8 +78,21 @@ describe("actual signed testnet setup policies", () => {
         subInvocations: [...root.subInvocations, ...root.subInvocations],
       }),
     });
-    const body=txV1(tx);
-    const changed=new Transaction(xdr.TransactionEnvelope.envelopeTypeTx(new xdr.TransactionV1Envelope({tx:new xdr.Transaction({...body,operations:[Operation.invokeHostFunction({func:op.func,auth:[badAuth]})]}),signatures:[]})),b.networkPassphrase);
+    const body = txV1(tx);
+    const changed = new Transaction(
+      xdr.TransactionEnvelope.envelopeTypeTx(
+        new xdr.TransactionV1Envelope({
+          tx: new xdr.Transaction({
+            ...body,
+            operations: [
+              Operation.invokeHostFunction({ func: op.func, auth: [badAuth] }),
+            ],
+          }),
+          signatures: [],
+        }),
+      ),
+      b.networkPassphrase,
+    );
     r.transactionXdr = changed.toXDR();
     r.feeMaximumStroops = changed.fee;
     r.envelopeDigest = digest(changed.toEnvelope().toXDR());
@@ -125,4 +138,28 @@ it("roundtrips integer quantities across the full supported precision and i128 r
     ).toBe(amount.toString());
   }
   expect(() => parseAmount("1".repeat(100000), 7)).toThrow();
+});
+
+it("rejects seeded malformed XDR and single byte mutations of genuine signed envelopes", () => {
+  let seed = 0x5e71a2c9;
+  for (const a of reviews) {
+    const original = Buffer.from(a.signedXdr, "base64");
+    for (let n = 0; n < 600; n++) {
+      seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+      const bytes = Buffer.from(original),
+        index = seed % bytes.length;
+      bytes[index] = bytes[index]! ^ (1 << n % 8);
+      expect(() =>
+        verifySetupSigned(bytes.toString("base64"), a.review, b),
+      ).toThrow();
+    }
+    for (const bytes of [
+      original.subarray(0, original.length - 1),
+      original.subarray(0, 10),
+      Buffer.alloc(0),
+    ])
+      expect(() =>
+        verifySetupSigned(bytes.toString("base64"), a.review, b),
+      ).toThrow();
+  }
 });

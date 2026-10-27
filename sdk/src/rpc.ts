@@ -1,5 +1,6 @@
 import {
   Account,
+  Networks,
   Address,
   Contract,
   Transaction,
@@ -294,7 +295,9 @@ export async function decodeReceipt(
     rawStatus: result.status,
   };
   if (result.status === rpc.Api.GetTransactionStatus.NOT_FOUND)
-    return { ...base, state: "unknown" };
+    return (
+      (await archivedObservation(b, hash)) ?? { ...base, state: "unknown" }
+    );
   const tx = decodeEnvelope(
     result.envelopeXdr.toXDR("base64"),
     b.networkPassphrase,
@@ -426,5 +429,61 @@ export async function* watchExit(
       const timer = setTimeout(finish, delay);
       signal.addEventListener("abort", finish, { once: true });
     });
+  }
+}
+
+/** Horizon supplies signed envelope/result confirmation after an RPC retention window.
+ * It does not provide contract return metadata, so this path never invents a guard receipt. */
+export async function archivedObservation(
+  b: DeploymentBundle,
+  hash: string,
+): Promise<Observation | undefined> {
+  if (
+    b.environment !== "testnet" ||
+    b.networkPassphrase !== Networks.TESTNET ||
+    !/^[a-f0-9]{64}$/.test(hash)
+  )
+    return;
+  try {
+    const response = await fetch(
+      "https://horizon-testnet.stellar.org/transactions/" + hash,
+      { signal: AbortSignal.timeout(8000) },
+    );
+    if (!response.ok) return;
+    const r = (await response.json()) as {
+      hash: string;
+      envelope_xdr: string;
+      result_xdr: string;
+      successful: boolean;
+      ledger: number;
+      fee_charged: string;
+    };
+    const tx = decodeEnvelope(r.envelope_xdr, b.networkPassphrase),
+      result = xdr.TransactionResult.fromXDR(r.result_xdr, "base64");
+    assert(
+      r.hash === hash &&
+        hex(tx.hash()) === hash &&
+        Number.isSafeInteger(r.ledger) &&
+        r.ledger > 0 &&
+        typeof r.successful === "boolean",
+      "ArchiveHash",
+    );
+    const success = result.result.type === "txSuccess";
+    assert(
+      success === r.successful &&
+        result.feeCharged.toString() === r.fee_charged,
+      "ArchiveResult",
+    );
+    return {
+      hash,
+      state: success ? "succeeded" : "failed",
+      ledger: r.ledger,
+      actualFee: result.feeCharged.toString(),
+      observedAt: new Date().toISOString(),
+      provider: "horizon-testnet.stellar.org",
+      rawStatus: success ? "SUCCESS" : "FAILED",
+    };
+  } catch {
+    return;
   }
 }

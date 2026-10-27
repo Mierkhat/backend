@@ -142,6 +142,7 @@ export function decodeEnvelope(
     tx instanceof Transaction && tx.toEnvelope().type === "envelopeTypeTx",
     "UnsupportedEnvelope",
   );
+  assert(tx.toXDR() === xdrText, "NonCanonicalEnvelope", "failure.authority");
   return tx;
 }
 export function txV1(tx: Transaction) {

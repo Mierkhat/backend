@@ -23,6 +23,7 @@ import {
   validateBundle,
 } from "./policy.js";
 import {
+  archivedObservation,
   latestLedger,
   loadDeployment,
   readContract,
@@ -576,7 +577,10 @@ export async function transactionObservation(
 ): Promise<Observation> {
   const r = await s.getTransaction(hash),
     base = { hash, observedAt: new Date().toISOString(), rawStatus: r.status };
-  if (r.status === "NOT_FOUND") return { ...base, state: "unknown" };
+  if (r.status === "NOT_FOUND")
+    return (
+      (await archivedObservation(b, hash)) ?? { ...base, state: "unknown" }
+    );
   const tx = decodeEnvelope(r.envelopeXdr.toXDR("base64"), b.networkPassphrase);
   assert(hex(tx.hash()) === hash, "LookupHash");
   return {

@@ -56,6 +56,7 @@ it("preserves terminal evidence against a delayed unknown observation", () => {
     { hash: pointer.hash, state: "unknown", observedAt: pointer.createdAt },
     s,
   );
+  expect(rememberPending(pointer, s)).toBe(true);
   expect(readPendingRecords(s)[0]?.state).toBe("succeeded");
   expect(
     rememberObservation(

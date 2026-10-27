@@ -83,7 +83,7 @@ export class SetupService {
           })),
         };
       const unresolved = await c.query(
-        `SELECT 1 FROM setup_jobs WHERE kind='faucet' AND state NOT IN ('succeeded','failed') LIMIT 1`,
+        `SELECT 1 FROM setup_jobs WHERE kind='faucet' AND state NOT IN ('succeeded','failed') AND created_at>now()-interval '5 minutes' LIMIT 1`,
       );
       assert(!unresolved.rowCount, "FaucetBusy", "faucet.busy");
       const daily = await c.query(
@@ -204,7 +204,7 @@ export class SetupService {
         });
       } catch {}
       await c.query(
-        `UPDATE setup_jobs SET state=$1,observation=$2,updated_at=now(),next_check_at=now()+interval '4 seconds',encrypted=CASE WHEN $1 IN ('succeeded','failed') OR created_at<now()-interval '24 hours' THEN NULL ELSE encrypted END WHERE tx_hash=$3 AND state NOT IN ('succeeded','failed')`,
+        `UPDATE setup_jobs SET state=$1,observation=$2,updated_at=now(),next_check_at=now()+CASE WHEN created_at<now()-interval '1 hour' THEN interval '5 minutes' ELSE interval '4 seconds' END,encrypted=CASE WHEN $1 IN ('succeeded','failed') OR created_at<now()-interval '24 hours' THEN NULL ELSE encrypted END WHERE tx_hash=$3 AND state NOT IN ('succeeded','failed')`,
         [observation.state, observation, row.tx_hash],
       );
     } finally {

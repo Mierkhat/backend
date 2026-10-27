@@ -65,7 +65,7 @@ const app = await createApp({
 let stopping = false;
 let active: Promise<unknown> | undefined;
 const timer = setInterval(() => {
-  if (stopping || active) return;
+  if (stopping || active || process.env.WORKERS_ENABLED === "0") return;
   active = Promise.all([
     reconcileOne(store, providers, bundles),
     setup?.reconcile(),

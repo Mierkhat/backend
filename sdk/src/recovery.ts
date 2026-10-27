@@ -64,6 +64,16 @@ export function rememberPending(
   try {
     const key = recoveryKey(result.data),
       json = JSON.stringify(result.data);
+    const prior = recoveryRecordSchema.safeParse(
+      JSON.parse(storage.getItem(key) ?? "null"),
+    );
+    if (
+      prior.success &&
+      prior.data.hash === result.data.hash &&
+      prior.data.environment === result.data.environment &&
+      prior.data.terminal
+    )
+      return true;
     storage.setItem(key, json);
     return storage.getItem(key) === json;
   } catch {
@@ -80,7 +90,13 @@ export function rememberObservation(
     const prior = recoveryRecordSchema.safeParse(
       JSON.parse(storage.getItem(recoveryKey(pointer)) ?? "null"),
     );
-    if (prior.success && prior.data.terminal) return true;
+    if (
+      prior.success &&
+      prior.data.hash === pointer.hash &&
+      prior.data.environment === pointer.environment &&
+      prior.data.terminal
+    )
+      return true;
   } catch {}
   const record = recoveryRecordSchema.safeParse({
     ...pointer,
