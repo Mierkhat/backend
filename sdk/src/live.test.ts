@@ -18,6 +18,7 @@ import { txV1 } from "./policy.js";
 import { digest } from "./codec.js";
 import { parseAmount, formatAmount, I128_MAX } from "./amount.js";
 import registry from "../deployments/index.json" with { type: "json" };
+import restoreFixture from "../fixtures/testnet-restore.json" with { type: "json" };
 import actual from "../fixtures/testnet-setup.json" with { type: "json" };
 const b = bundleSchema.parse(registry[0]);
 const reviews = actual.map((a) => ({ ...a, review: a.review as SetupReview }));
@@ -162,4 +163,44 @@ it("rejects seeded malformed XDR and single byte mutations of genuine signed env
         verifySetupSigned(bytes.toString("base64"), a.review, b),
       ).toThrow();
   }
+});
+
+it("accepts actual committed restoration and rejects any unpinned restoration key", () => {
+  const r = structuredClone(restoreFixture.review) as SetupReview;
+  expect(verifySetupSigned(restoreFixture.signedXdr, r, b).hash).toBe(
+    restoreFixture.hash,
+  );
+  const tx = new Transaction(r.transactionXdr, b.networkPassphrase),
+    body = txV1(tx);
+  if (body.ext.type !== "sorobanData") throw Error("fixture");
+  const data = body.ext.sorobanData;
+  const altered = new xdr.SorobanTransactionData({
+    ...data,
+    resources: new xdr.SorobanResources({
+      ...data.resources,
+      footprint: new xdr.LedgerFootprint({
+        readOnly: [],
+        readWrite: [
+          xdr.LedgerKey.contractCode(
+            new xdr.LedgerKeyContractCode({ hash: "ab".repeat(32) }),
+          ),
+        ],
+      }),
+    }),
+  });
+  const changed = new Transaction(
+    xdr.TransactionEnvelope.envelopeTypeTx(
+      new xdr.TransactionV1Envelope({
+        tx: new xdr.Transaction({
+          ...body,
+          ext: xdr.TransactionExt.sorobanData(altered),
+        }),
+        signatures: [],
+      }),
+    ),
+    b.networkPassphrase,
+  );
+  r.transactionXdr = changed.toXDR();
+  r.envelopeDigest = digest(changed.toEnvelope().toXDR());
+  expect(() => verifySetup(r, r.draft, b)).toThrow("RestoreFootprint");
 });

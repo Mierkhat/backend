@@ -236,3 +236,15 @@ describe("compiled ABI vectors", () => {
     expect(authDigest(tx)).toBe(vector.authFixture.observedAuthDigest);
   });
 });
+
+it("rejects an old review when the deployment epoch changes with the same contract IDs", () => {
+  const f = sdkFixture();
+  expect(() =>
+    verifyReview(
+      f.review,
+      f.draft,
+      { ...f.bundle, epoch: "new-epoch" },
+      f.ledger,
+    ),
+  ).toThrow("DraftDomain");
+});

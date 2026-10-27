@@ -9,7 +9,9 @@ export const recoveryRecordSchema = z
     intentHash: z.union([hashSchema, z.literal("")]),
     createdAt: z.iso.datetime(),
     owner: accountSchema.optional(),
-    kind: z.enum(["exit", "deposit", "trustlines", "faucet"]).optional(),
+    kind: z
+      .enum(["exit", "deposit", "trustlines", "faucet", "restore"])
+      .optional(),
     terminal: z.boolean().optional(),
     state: z
       .enum(["recorded", "pending", "unknown", "succeeded", "failed"])
@@ -64,11 +66,15 @@ export function rememberPending(
   try {
     const key = recoveryKey(result.data),
       json = JSON.stringify(result.data);
-    const prior = recoveryRecordSchema.safeParse(
-      JSON.parse(storage.getItem(key) ?? "null"),
-    );
+    let prior: ReturnType<typeof recoveryRecordSchema.safeParse> | undefined;
+    try {
+      prior = recoveryRecordSchema.safeParse(
+        JSON.parse(storage.getItem(key) ?? "null"),
+      );
+    } catch {}
+
     if (
-      prior.success &&
+      prior?.success &&
       prior.data.hash === result.data.hash &&
       prior.data.environment === result.data.environment &&
       prior.data.terminal

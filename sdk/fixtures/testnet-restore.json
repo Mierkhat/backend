@@ -1,0 +1,23 @@
+{
+  "review": {
+    "draft": {
+      "kind": "restore",
+      "owner": "GAKBD3QFS4XCFEJJRCBO6BIKMZA7DUKYXA27JKS5QMDCE3UEIQCZFX2I",
+      "amountsRaw": [],
+      "minimumsRaw": [],
+      "trustAssets": []
+    },
+    "epoch": "integration-fixture-v1",
+    "authDigest": "cf1cbb66a638b4860a516671fb74850e6ccf787fe6c4c8d29e9c04efe880bd05",
+    "environment": "testnet",
+    "preparedTime": "1793094762",
+    "envelopeDigest": "9c125bcef5c3e3661ac5dbbf3a30777a4d9b6db8a8a1c95d0be1a960c4b7ccdb",
+    "preparedLedger": 5414235,
+    "transactionXdr": "AAAAAgAAAAAUEe4Fly4ikSmIgu8FCmZB8dFYuDX0ql2DBiJuhEQFkgAAGrwAUpySAAAABAAAAAIAAAABAAAAAAAAAAAAAAAAauB1HgAAAAEAAAAAAFKdfwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAGgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFtQAAAAA",
+    "expectedSharesRaw": "0",
+    "feeMaximumStroops": "6844",
+    "expectedDepositedRaw": []
+  },
+  "signedXdr": "AAAAAgAAAAAUEe4Fly4ikSmIgu8FCmZB8dFYuDX0ql2DBiJuhEQFkgAAGrwAUpySAAAABAAAAAIAAAABAAAAAAAAAAAAAAAAauB1HgAAAAEAAAAAAFKdfwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAGgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFtQAAAABhEQFkgAAAECVuQMJVzcB6rarAfQDBeQa9lOey9DbuAro8REpof2d9IifLSWr6XjvFgg8nDQvDqey5KwvUOnvMavNuvCWTnMI",
+  "hash": "22655cd429173be925364ab75c3c490ebdefac488eeb8909a810fa1dc4f569cf"
+}

@@ -39,12 +39,17 @@ await pg.start();
 console.log("Persistent PostgreSQL ready on 127.0.0.1:55432");
 process.env.DATABASE_URL = `postgresql://postgres:${config.password}@127.0.0.1:55432/postgres`;
 process.env.PAYLOAD_KEY = config.payloadKey;
-process.env.ALLOWED_ORIGINS =
+process.env.ALLOWED_ORIGINS ??=
   "http://localhost:5173,http://127.0.0.1:5173,http://localhost:4173,http://127.0.0.1:4173";
-process.env.TESTNET_FAUCET_KEY_FILE = resolve(
-  root,
-  ".tooling/testnet/keys.json",
-);
+if (!process.env.TESTNET_FAUCET_KEY_FILE) {
+  const candidate = resolve(root, ".tooling/testnet/keys.json");
+  try {
+    await access(candidate);
+    process.env.TESTNET_FAUCET_KEY_FILE = candidate;
+  } catch {
+    /* Read-only CI and standalone setups can run without an issuer secret. */
+  }
+}
 await import("../src/server.js");
 for (const signal of ["SIGINT", "SIGTERM"] as const)
   process.once(signal, () => {

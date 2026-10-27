@@ -84,3 +84,10 @@ it("returns a usable failure signal when storage is denied", () => {
     ),
   ).toBe(false);
 });
+
+it("replaces a corrupt record at the same hash instead of treating available storage as denied", () => {
+  const s = storage();
+  s.setItem(recoveryKey(pointer), "{");
+  expect(rememberPending(pointer, s)).toBe(true);
+  expect(readPendingRecords(s)).toEqual([pointer]);
+});

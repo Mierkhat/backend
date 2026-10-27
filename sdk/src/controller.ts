@@ -9,6 +9,14 @@ import type {
 } from "./model.js";
 // One unresolved prompt per account even after a view invalidates its result.
 const prompts = new Set<string>();
+export function reserveWalletPrompt(owner: string): () => void {
+  assert(!prompts.has(owner), "PromptOpen", "wallet.prompt");
+  prompts.add(owner);
+  return () => {
+    prompts.delete(owner);
+  };
+}
+
 export class ExitController {
   private generation = 0;
   private revision = 0;
@@ -65,8 +73,7 @@ export class ExitController {
       "PromptInvalidated",
       "wallet.changed",
     );
-    assert(!prompts.has(identity.address), "PromptOpen", "wallet.prompt");
-    prompts.add(identity.address);
+    const release = reserveWalletPrompt(identity.address);
     try {
       const signed = await wallet.sign(
         review.transactionXdr,
@@ -83,7 +90,7 @@ export class ExitController {
         return;
       return verifySigned(signed, review, b);
     } finally {
-      prompts.delete(identity.address);
+      release();
     }
   }
 }

@@ -8,11 +8,13 @@ import {
   Operation,
   Transaction,
   TransactionBuilder,
+  SorobanDataBuilder,
   nativeToScVal,
   scValToNative,
   rpc,
   xdr,
 } from "@stellar/stellar-sdk";
+import { reserveWalletPrompt } from "./controller.js";
 import { rawAmount } from "./amount.js";
 import { digest, hex } from "./codec.js";
 import {
@@ -222,7 +224,7 @@ export async function quoteExit(
     timestamp: l.timestamp,
   };
 }
-export type SetupKind = "trustlines" | "deposit";
+export type SetupKind = "trustlines" | "deposit" | "restore";
 export interface SetupDraft {
   kind: SetupKind;
   owner: string;
@@ -268,12 +270,45 @@ function callFor(d: SetupDraft, b: DeploymentBundle): xdr.Operation {
     nativeToScVal(false),
   );
 }
+export function restorationKeys(bundle: DeploymentBundle): xdr.LedgerKey[] {
+  const b = validateBundle(bundle),
+    pins = [
+      { address: b.guard, wasm_hash: b.guardWasmHash },
+      b.profile.vault,
+      b.profile.router,
+      b.profile.factory,
+      ...b.profile.assets.flatMap((a) => (a.pair ? [a.pair] : [])),
+    ];
+  const instances = [
+    ...new Set([
+      ...pins.map((p) => p.address),
+      ...b.tokens.map((t) => t.address),
+    ]),
+  ].map((address) =>
+    xdr.LedgerKey.contractData(
+      new xdr.LedgerKeyContractData({
+        contract: Address.fromString(address).toScAddress(),
+        key: xdr.ScVal.scvLedgerKeyContractInstance(),
+        durability: xdr.ContractDataDurability.persistent,
+      }),
+    ),
+  );
+  const code = [...new Set(pins.map((p) => p.wasm_hash))].map((hash) =>
+    xdr.LedgerKey.contractCode(new xdr.LedgerKeyContractCode({ hash })),
+  );
+  return [...instances, ...code];
+}
 export async function prepareSetup(
   d: SetupDraft,
   b: DeploymentBundle,
   s: rpc.Server,
 ): Promise<SetupReview> {
-  await loadDeployment(b, s, d.owner);
+  if (d.kind !== "restore") await loadDeployment(b, s, d.owner);
+  else
+    assert(
+      (await s.getNetwork()).passphrase === validateBundle(b).networkPassphrase,
+      "RpcNetwork",
+    );
   const l = await latestLedger(s),
     account = await s.getAccount(d.owner);
   const builder = new TransactionBuilder(account, {
@@ -284,7 +319,19 @@ export async function prepareSetup(
     .setLedgerbounds(0, l.sequence + 36);
   let expectedDepositedRaw: string[] = [],
     expectedSharesRaw = "0";
-  if (d.kind === "trustlines") {
+  if (d.kind === "restore") {
+    assert(
+      d.amountsRaw.length === 0 &&
+        d.minimumsRaw.length === 0 &&
+        d.trustAssets.length === 0,
+      "RestoreDraft",
+    );
+    builder
+      .addOperation(Operation.restoreFootprint({}))
+      .setSorobanData(
+        new SorobanDataBuilder().setReadWrite(restorationKeys(b)).build(),
+      );
+  } else if (d.kind === "trustlines") {
     assert(
       d.amountsRaw.length === 0 &&
         d.minimumsRaw.length === 0 &&
@@ -317,22 +364,23 @@ export async function prepareSetup(
     builder.addOperation(callFor(d, b));
   }
   let tx = builder.build();
-  if (d.kind === "deposit") {
+  if (d.kind === "deposit" || d.kind === "restore") {
     const sim = await s.simulateTransaction(tx);
     assert(
-      rpc.Api.isSimulationSuccess(sim) &&
-        !rpc.Api.isSimulationRestore(sim) &&
-        sim.result,
-      "DepositRejected",
-      "deposit.rejected",
+      rpc.Api.isSimulationSuccess(sim) && !rpc.Api.isSimulationRestore(sim),
+      "SetupRejected",
+      d.kind === "restore" ? "restore.unavailable" : "deposit.rejected",
     );
-    const result = scValToNative(sim.result.retval) as [
-      bigint[],
-      bigint,
-      unknown,
-    ];
-    expectedDepositedRaw = result[0].map(String);
-    expectedSharesRaw = String(result[1]);
+    if (d.kind === "deposit") {
+      assert(sim.result, "DepositRejected");
+      const result = scValToNative(sim.result.retval) as [
+        bigint[],
+        bigint,
+        unknown,
+      ];
+      expectedDepositedRaw = result[0].map(String);
+      expectedSharesRaw = String(result[1]);
+    }
     tx = rpc.assembleTransaction(tx, sim).build();
   }
   const r: SetupReview = {
@@ -414,7 +462,36 @@ export function verifySetup(
         "review.stale",
       );
   }
-  if (d.kind === "trustlines") {
+  if (d.kind === "restore") {
+    assert(
+      d.amountsRaw.length === 0 &&
+        d.minimumsRaw.length === 0 &&
+        d.trustAssets.length === 0 &&
+        r.expectedDepositedRaw.length === 0 &&
+        r.expectedSharesRaw === "0",
+      "RestoreDraft",
+    );
+    const op = tx.operations[0],
+      ext = txV1(tx).ext;
+    assert(
+      tx.operations.length === 1 &&
+        op?.type === "restoreFootprint" &&
+        !op.source &&
+        ext.type === "sorobanData",
+      "RestoreOperation",
+    );
+    const footprint = ext.sorobanData.resources.footprint,
+      expected = restorationKeys(b)
+        .map((k) => k.toXDR("base64"))
+        .sort(),
+      actual = footprint.readWrite.map((k) => k.toXDR("base64")).sort();
+    assert(
+      footprint.readOnly.length === 0 &&
+        new Set(actual).size === actual.length &&
+        actual.every((key) => expected.includes(key)),
+      "RestoreFootprint",
+    );
+  } else if (d.kind === "trustlines") {
     assert(
       d.amountsRaw.length === 0 &&
         d.minimumsRaw.length === 0 &&
@@ -553,22 +630,32 @@ export async function signSetup(
     "Identity",
     "wallet.changed",
   );
-  await loadDeployment(b, s, r.draft.owner);
+  if (r.draft.kind !== "restore") await loadDeployment(b, s, r.draft.owner);
+  else
+    assert(
+      (await s.getNetwork()).passphrase === b.networkPassphrase,
+      "RpcNetwork",
+    );
   verifySetup(r, r.draft, b, await reviewLedger(s, r.draft.owner));
-  const bytes = await w.sign(
-    r.transactionXdr,
-    b.networkPassphrase,
-    r.draft.owner,
-  );
-  const after = await w.identity();
-  assert(
-    after.address === identity.address &&
-      after.networkPassphrase === identity.networkPassphrase,
-    "Identity",
-    "wallet.changed",
-  );
-  verifySetupSigned(bytes, r, b);
-  return bytes;
+  const release = reserveWalletPrompt(identity.address);
+  try {
+    const bytes = await w.sign(
+      r.transactionXdr,
+      b.networkPassphrase,
+      r.draft.owner,
+    );
+    const after = await w.identity();
+    assert(
+      after.address === identity.address &&
+        after.networkPassphrase === identity.networkPassphrase,
+      "Identity",
+      "wallet.changed",
+    );
+    verifySetupSigned(bytes, r, b);
+    return bytes;
+  } finally {
+    release();
+  }
 }
 export async function transactionObservation(
   s: rpc.Server,

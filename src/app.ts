@@ -43,6 +43,41 @@ const submitBody = domain
   })
   .strict();
 const query = z.object({ environment: environmentSchema }).strict();
+const setupDraft = z
+  .object({
+    kind: z.enum(["trustlines", "deposit", "restore"]),
+    owner: accountSchema,
+    amountsRaw: z.array(amountSchema).max(2),
+    minimumsRaw: z.array(amountSchema).max(2),
+    trustAssets: z.array(z.string().max(56)).max(4),
+  })
+  .strict();
+const setupReviewSchema = z
+  .object({
+    draft: setupDraft,
+    environment: z.literal("testnet"),
+    epoch: z.string().max(80),
+    transactionXdr: z.string().max(349528),
+    envelopeDigest: hashSchema,
+    authDigest: hashSchema,
+    preparedLedger: z.number().int().positive(),
+    preparedTime: amountSchema,
+    expectedDepositedRaw: z.array(amountSchema).max(2),
+    expectedSharesRaw: amountSchema,
+    feeMaximumStroops: amountSchema,
+  })
+  .strict();
+const setupSubmitSchema = z
+  .object({ signedXdr: z.string().max(349528), review: setupReviewSchema })
+  .strict();
+const ownerBody = z.object({ owner: accountSchema }).strict();
+const quoteBody = z
+  .object({ owner: accountSchema, shares: amountSchema })
+  .strict();
+const jsonBody = (schema: z.ZodType) => ({
+  required: true,
+  content: { "application/json": { schema: z.toJSONSchema(schema) } },
+});
 export async function createApp(options: {
   store: Store;
   providers: Providers;
@@ -125,6 +160,104 @@ export async function createApp(options: {
     openapi: "3.1.0",
     info: { title: "Mierkhat API", version: "0.1.0" },
     paths: {
+      "/v1/network": {
+        get: {
+          responses: {
+            "200": {
+              description: "Current verified testnet ledger and vault totals",
+            },
+          },
+        },
+      },
+      "/v1/accounts/{owner}": {
+        get: {
+          parameters: [
+            {
+              in: "path",
+              name: "owner",
+              required: true,
+              schema: z.toJSONSchema(accountSchema),
+            },
+          ],
+          responses: {
+            "200": {
+              description:
+                "Actual account funding, trustline, asset and vault share state",
+            },
+          },
+        },
+      },
+      "/v1/exit/quote": {
+        post: {
+          requestBody: jsonBody(quoteBody),
+          responses: {
+            "200": {
+              description:
+                "Current on-chain withdrawal and direct conversion quote",
+            },
+          },
+        },
+      },
+      "/v1/setup/prepare": {
+        post: {
+          requestBody: jsonBody(setupDraft),
+          responses: {
+            "200": {
+              description:
+                "Unsigned trustline, deposit or explicit restoration review requiring independent verification",
+            },
+          },
+        },
+      },
+      "/v1/setup/submit": {
+        post: {
+          requestBody: jsonBody(setupSubmitSchema),
+          responses: {
+            "202": {
+              description:
+                "Exact verified signed bytes durably recorded before send",
+            },
+          },
+        },
+      },
+      "/v1/testnet/fund": {
+        post: {
+          requestBody: jsonBody(ownerBody),
+          responses: {
+            "200": { description: "Actual funded testnet account state" },
+          },
+        },
+      },
+      "/v1/testnet/faucet": {
+        post: {
+          requestBody: jsonBody(ownerBody),
+          responses: {
+            "202": {
+              description:
+                "Durably recorded actual token issuance hash and allocation",
+            },
+          },
+        },
+      },
+      "/v1/setup/transactions/{hash}": {
+        get: {
+          parameters: [
+            {
+              in: "path",
+              name: "hash",
+              required: true,
+              schema: z.toJSONSchema(hashSchema),
+            },
+          ],
+          responses: {
+            "200": {
+              description:
+                "Committed transaction observation or explicit unknown",
+            },
+          },
+        },
+      },
+
       "/v1/exit/prepare": {
         post: {
           requestBody: {
@@ -287,15 +420,6 @@ export async function createApp(options: {
       );
     },
   );
-  const setupDraft = z
-    .object({
-      kind: z.enum(["trustlines", "deposit"]),
-      owner: accountSchema,
-      amountsRaw: z.array(amountSchema).max(2),
-      minimumsRaw: z.array(amountSchema).max(2),
-      trustAssets: z.array(z.string().max(56)).max(4),
-    })
-    .strict();
   app.post(
     "/v1/setup/prepare",
     { config: { rateLimit: { max: 15, timeWindow: "1 minute" } } },
@@ -306,27 +430,7 @@ export async function createApp(options: {
   );
   app.post("/v1/setup/submit", async (req, reply) => {
     assert(options.setup, "SetupUnavailable");
-    const body = z
-      .object({
-        signedXdr: z.string().max(349528),
-        review: z
-          .object({
-            draft: setupDraft,
-            environment: z.literal("testnet"),
-            epoch: z.string().max(80),
-            transactionXdr: z.string().max(349528),
-            envelopeDigest: hashSchema,
-            authDigest: hashSchema,
-            preparedLedger: z.number().int().positive(),
-            preparedTime: amountSchema,
-            expectedDepositedRaw: z.array(amountSchema).max(2),
-            expectedSharesRaw: amountSchema,
-            feeMaximumStroops: amountSchema,
-          })
-          .strict(),
-      })
-      .strict()
-      .parse(req.body);
+    const body = setupSubmitSchema.parse(req.body);
     const hash = await options.setup.record(body.signedXdr, body.review);
     return reply.code(202).send({ hash, state: "recorded" });
   });
