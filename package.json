@@ -11,7 +11,8 @@
     "test": "vitest run",
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "migrate": "tsx src/migrate.ts",
-    "local": "tsx scripts/local.ts"
+    "local": "tsx scripts/local.ts",
+    "prebuild": "pnpm --filter @mierkhat/sdk build"
   },
   "dependencies": {
     "@fastify/cors": "11.2.0",
@@ -39,5 +40,9 @@
     "url": "https://github.com/Mierkhat/backend/issues"
   },
   "homepage": "https://github.com/Mierkhat/backend#readme",
-  "description": "Durable Stellar testnet preparation, submission and recovery API."
+  "description": "Durable Stellar testnet preparation, submission and recovery API.",
+  "packageManager": "pnpm@12.15.0",
+  "engines": {
+    "node": "24.22.1"
+  }
 }
