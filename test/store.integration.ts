@@ -140,6 +140,59 @@ describe("R04/R06/R07 durable PostgreSQL tracking", () => {
       (await pool.query("SELECT count(*) FROM signed_payloads")).rows[0].count,
     ).toBe("0");
   });
+  it("enriches a receipt-less success once without permitting terminal replacement", async () => {
+    const { a, f } = attempt();
+    await store.record(a, "receipt-enrichment-attempt");
+    const pending = (await store.getAttempt(a.environment, a.txHash))!;
+    await store.update(pending, {
+      hash: a.txHash,
+      state: "succeeded",
+      ledger: 123,
+      observedAt: new Date().toISOString(),
+      provider: "horizon-testnet.stellar.org",
+    });
+    const terminal = (await store.getAttempt(a.environment, a.txHash))!;
+    const receipt = {
+      intentId: f.draft.intent.intent_id,
+      intentHash: a.review.intentHash,
+      profileHash: f.bundle.profileHash,
+      owner: f.draft.intent.owner,
+      sharesSpent: f.draft.intent.shares,
+      received: "1",
+      withdrawn: ["1", "1"],
+      swappedOut: ["1", "1"],
+      ledger: 123,
+      timestamp: "1",
+    };
+    const observation = {
+      hash: a.txHash,
+      state: "succeeded" as const,
+      ledger: 123,
+      observedAt: new Date().toISOString(),
+      receipt,
+    };
+    expect(await store.enrichReceipt(terminal, observation)).toBe(true);
+    expect(await store.enrichReceipt(terminal, observation)).toBe(false);
+    const enriched = (await store.getAttempt(a.environment, a.txHash))!;
+    expect(enriched.observation?.receipt).toEqual(receipt);
+    expect(await store.enrichReceipt(enriched, observation)).toBe(false);
+    expect(
+      await store.update(enriched, {
+        hash: a.txHash,
+        state: "unknown",
+        observedAt: new Date().toISOString(),
+      }),
+    ).toBe(false);
+    await expect(
+      store.enrichReceipt(enriched, {
+        ...observation,
+        receipt: { ...receipt, owner: f.bundle.guard },
+      }),
+    ).rejects.toThrow("ReceiptMismatch");
+    expect((await pool.query("SELECT 1 FROM signed_payloads")).rowCount).toBe(
+      0,
+    );
+  });
   it("records before send and resumes after a crashed lease", async () => {
     const { a } = attempt();
     await store.record(a, "attempt-key-000004");

@@ -312,7 +312,11 @@ export async function decodeKnownReceipt(
   };
   if (result.status === rpc.Api.GetTransactionStatus.NOT_FOUND)
     return (
-      (await archivedObservation(b, hash)) ?? { ...base, state: "unknown" }
+      (await archivedObservation(
+        b,
+        hash,
+        candidates.map((candidate) => candidate.guard),
+      )) ?? { ...base, state: "unknown" }
     );
   const tx = decodeEnvelope(
     result.envelopeXdr.toXDR("base64"),
@@ -463,6 +467,7 @@ export async function* watchExit(
 export async function archivedObservation(
   b: DeploymentBundle,
   hash: string,
+  guards: string[] = [b.guard],
 ): Promise<Observation | undefined> {
   if (
     b.environment !== "testnet" ||
@@ -483,6 +488,7 @@ export async function archivedObservation(
       successful: boolean;
       ledger: number;
       fee_charged: string;
+      created_at: string;
     };
     const tx = decodeEnvelope(r.envelope_xdr, b.networkPassphrase),
       result = xdr.TransactionResult.fromXDR(r.result_xdr, "base64");
@@ -500,14 +506,35 @@ export async function archivedObservation(
         result.feeCharged.toString() === r.fee_charged,
       "ArchiveResult",
     );
+    const root = tx.operations[0];
+    const guarded =
+      root?.type === "invokeHostFunction" &&
+      root.func.type === "hostFunctionTypeInvokeContract" &&
+      root.func.invokeContract.functionName.toString() === "execute_exit" &&
+      guards.includes(
+        Address.fromScAddress(
+          root.func.invokeContract.contractAddress,
+        ).toString(),
+      );
+    // Horizon can index a new success before RPC. Keep checking for its committed
+    // return metadata instead of permanently caching a receipt-less terminal state.
+    const awaitingReceipt =
+      success &&
+      guarded &&
+      (!Number.isFinite(Date.parse(r.created_at)) ||
+        Date.now() - Date.parse(r.created_at) < 600000);
     return {
       hash,
-      state: success ? "succeeded" : "failed",
+      state: awaitingReceipt ? "pending" : success ? "succeeded" : "failed",
       ledger: r.ledger,
       actualFee: result.feeCharged.toString(),
       observedAt: new Date().toISOString(),
       provider: "horizon-testnet.stellar.org",
-      rawStatus: success ? "SUCCESS" : "FAILED",
+      rawStatus: awaitingReceipt
+        ? "SUCCESS_AWAITING_RECEIPT"
+        : success
+          ? "SUCCESS"
+          : "FAILED",
     };
   } catch {
     return;

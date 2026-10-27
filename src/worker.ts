@@ -39,7 +39,11 @@ export async function reconcileOne(
     if (bundle)
       observation = await providers.run(row.environment, async (server) => {
         const found = await decodeReceipt(server, bundle, row.tx_hash);
-        if (found.state === "succeeded" || found.state === "failed")
+        if (
+          found.state === "succeeded" ||
+          found.state === "failed" ||
+          found.rawStatus === "SUCCESS_AWAITING_RECEIPT"
+        )
           return found;
         if (row.encrypted && bundle.enabled && bundle.reviewed) {
           const bytes = store.unseal(

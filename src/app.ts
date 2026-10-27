@@ -594,22 +594,37 @@ export async function createApp(options: {
     );
     if (setupRow.rowCount && options.setup) return options.setup.status(p.hash);
     const row = await store.getAttempt(q.environment, p.hash);
-    if (row?.state === "succeeded" || row?.state === "failed")
+    if (
+      row?.state === "failed" ||
+      (row?.state === "succeeded" && row.observation?.receipt)
+    )
       return row.observation;
     const b = bundle(q.environment, row?.epoch, true);
-    const observation = await providers.run(q.environment, (server) =>
-      row
-        ? decodeReceipt(server, b, p.hash)
-        : decodeKnownReceipt(
-            server,
-            knownBundles.filter(
-              (candidate) => candidate.environment === q.environment,
+    try {
+      const observation = await providers.run(q.environment, (server) =>
+        row
+          ? decodeReceipt(server, b, p.hash)
+          : decodeKnownReceipt(
+              server,
+              knownBundles.filter(
+                (candidate) => candidate.environment === q.environment,
+              ),
+              p.hash,
             ),
-            p.hash,
-          ),
-    );
-    if (row) await store.update(row, observation);
-    return observation;
+      );
+      if (row?.state === "succeeded") {
+        if (observation.state === "succeeded" && observation.receipt) {
+          await store.enrichReceipt(row, observation);
+          return observation;
+        }
+        return row.observation;
+      }
+      if (row) await store.update(row, observation);
+      return observation;
+    } catch (error) {
+      if (row?.state === "succeeded") return row.observation;
+      throw error;
+    }
   });
   return app;
 }

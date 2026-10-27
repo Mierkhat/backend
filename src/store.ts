@@ -270,6 +270,26 @@ export class Store {
       client.release();
     }
   }
+  async enrichReceipt(
+    row: AttemptRow,
+    observation: Observation,
+  ): Promise<boolean> {
+    const receipt = observation.receipt;
+    if (
+      observation.state !== "succeeded" ||
+      observation.hash !== row.tx_hash ||
+      !receipt ||
+      receipt.intentHash !== row.intent_hash ||
+      receipt.intentId !== row.intent_id ||
+      receipt.owner !== row.owner
+    )
+      throw new Conflict("ReceiptMismatch");
+    const result = await this.pool.query(
+      `UPDATE attempts SET observation=$1,version=version+1,updated_at=now() WHERE environment=$2 AND tx_hash=$3 AND version=$4 AND state='succeeded' AND (observation->'receipt' IS NULL OR observation->'receipt'='null'::jsonb)`,
+      [observation, row.environment, row.tx_hash, row.version],
+    );
+    return !!result.rowCount;
+  }
   async prune(): Promise<void> {
     await this.pool.query(
       `UPDATE setup_jobs SET encrypted=NULL WHERE encrypted IS NOT NULL AND created_at<now()-interval '24 hours'; DELETE FROM setup_jobs WHERE state IN ('succeeded','failed') AND updated_at<now()-interval '90 days'; DELETE FROM signed_payloads WHERE expires_at<=now(); DELETE FROM submission_keys WHERE expires_at<=now(); DELETE FROM reviews WHERE expires_at<now()-interval '24 hours'; DELETE FROM attempts WHERE updated_at<now()-interval '90 days' AND state IN ('succeeded','failed');`,
