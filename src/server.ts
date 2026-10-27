@@ -4,6 +4,8 @@ import { bundleSchema } from "@mierkhat/sdk";
 import { createApp } from "./app.js";
 import { Store } from "./store.js";
 import { Providers } from "./providers.js";
+import { Keypair } from "@stellar/stellar-sdk";
+import { SetupService } from "./setup.js";
 import { reconcileOne } from "./worker.js";
 const databaseUrl = process.env.DATABASE_URL;
 const payloadKey = process.env.PAYLOAD_KEY;
@@ -40,7 +42,21 @@ const pool = new Pool({
 const store = new Store(pool, Buffer.from(payloadKey, "hex"));
 await store.migrate();
 const providers = new Providers(endpoints, networks);
+let issuer: Keypair | undefined;
+if (process.env.TESTNET_FAUCET_KEY_FILE) {
+  const keys = JSON.parse(
+    await readFile(process.env.TESTNET_FAUCET_KEY_FILE, "utf8"),
+  );
+  issuer = Keypair.fromSecret(keys.admin);
+}
+const liveBundle = bundles.find(
+  (b) => b.environment === "testnet" && b.enabled,
+);
+const setup = liveBundle
+  ? new SetupService(store, providers, liveBundle, issuer)
+  : undefined;
 const app = await createApp({
+  setup,
   store,
   providers,
   bundles,
@@ -50,7 +66,10 @@ let stopping = false;
 let active: Promise<unknown> | undefined;
 const timer = setInterval(() => {
   if (stopping || active) return;
-  active = reconcileOne(store, providers, bundles)
+  active = Promise.all([
+    reconcileOne(store, providers, bundles),
+    setup?.reconcile(),
+  ])
     .catch(() => {})
     .finally(() => {
       active = undefined;

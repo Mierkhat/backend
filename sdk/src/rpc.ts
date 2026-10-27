@@ -53,15 +53,18 @@ export async function reviewLedger(
   ]);
   return { ...ledger, sourceSequence: account.sequenceNumber() };
 }
-async function simulateRead(
+export async function readContract(
   server: rpc.Server,
   b: DeploymentBundle,
   owner: string,
   contract: string,
   method: string,
   args: xdr.ScVal[] = [],
+  source?: Account,
 ): Promise<xdr.ScVal> {
-  const account = await server.getAccount(owner);
+  const account = source
+    ? new Account(owner, source.sequenceNumber())
+    : await server.getAccount(owner);
   const tx = new TransactionBuilder(account, {
     fee: "100",
     networkPassphrase: b.networkPassphrase,
@@ -94,70 +97,71 @@ export async function loadDeployment(
     b.profile.factory,
     ...b.profile.assets.flatMap((a) => (a.pair ? [a.pair] : [])),
   ];
-  for (const pin of pins) {
-    const key = xdr.LedgerKey.contractData(
+  const contracts = [
+    ...pins.map((p) => p.address),
+    ...b.tokens.map((t) => t.address),
+  ];
+  const keys = contracts.map((address) =>
+    xdr.LedgerKey.contractData(
       new xdr.LedgerKeyContractData({
-        contract: Address.fromString(pin.address).toScAddress(),
+        contract: Address.fromString(address).toScAddress(),
         key: xdr.ScVal.scvLedgerKeyContractInstance(),
         durability: xdr.ContractDataDurability.persistent,
       }),
-    );
-    const result = await server.getLedgerEntries(key);
-    const v = result.entries[0]?.val;
+    ),
+  );
+  const entries = await server.getLedgerEntries(...keys);
+  for (let n = 0; n < keys.length; n++) {
+    const entry = entries.entries.find(
+      (e) => e.key.toXDR("base64") === keys[n]!.toXDR("base64"),
+    )?.val;
     assert(
-      v?.type === "contractData" &&
-        v.contractData.val.type === "scvContractInstance",
+      entry?.type === "contractData" &&
+        entry.contractData.val.type === "scvContractInstance",
       "MissingDependency",
     );
-    const executable = v.contractData.val.instance.executable;
-    assert(
-      executable.type === "contractExecutableWasm" &&
-        executable.wasmHash.toString() === pin.wasm_hash,
-      "CodeChanged",
-    );
+    const executable = entry.contractData.val.instance.executable;
+    if (n < pins.length)
+      assert(
+        executable.type === "contractExecutableWasm" &&
+          executable.wasmHash.toString() === pins[n]!.wasm_hash,
+        "CodeChanged",
+      );
+    else
+      assert(
+        executable.type === "contractExecutableStellarAsset",
+        "UnsupportedAsset",
+      );
   }
-  for (const token of b.tokens) {
-    const key = xdr.LedgerKey.contractData(
-      new xdr.LedgerKeyContractData({
-        contract: Address.fromString(token.address).toScAddress(),
-        key: xdr.ScVal.scvLedgerKeyContractInstance(),
-        durability: xdr.ContractDataDurability.persistent,
-      }),
-    );
-    const result = await server.getLedgerEntries(key);
-    const v = result.entries[0]?.val;
-    assert(
-      v?.type === "contractData" &&
-        v.contractData.val.type === "scvContractInstance" &&
-        v.contractData.val.instance.executable.type ===
-          "contractExecutableStellarAsset",
-      "UnsupportedAsset",
-    );
-    const decimals = scValToNative(
-      await simulateRead(server, b, owner, token.address, "decimals"),
-    );
-    const symbol = scValToNative(
-      await simulateRead(server, b, owner, token.address, "symbol"),
-    );
-    assert(
-      decimals === token.decimals && symbol === token.symbol,
-      "MetadataChanged",
-    );
-  }
-  const onchainProfile = await simulateRead(
-    server,
-    b,
-    owner,
-    b.guard,
-    "profile",
+  const source = await server.getAccount(owner);
+  await Promise.all(
+    b.tokens.map(async (token) => {
+      const [decimals, symbol] = await Promise.all(
+        ["decimals", "symbol"].map((method) =>
+          readContract(server, b, owner, token.address, method, [], source),
+        ),
+      );
+      assert(
+        scValToNative(decimals!) === token.decimals &&
+          scValToNative(symbol!) === token.symbol,
+        "MetadataChanged",
+      );
+    }),
   );
+  const [onchainProfile, shareDecimals] = await Promise.all([
+    readContract(server, b, owner, b.guard, "profile", [], source),
+    readContract(
+      server,
+      b,
+      owner,
+      b.profile.vault.address,
+      "decimals",
+      [],
+      source,
+    ),
+  ]);
   assert(digest(onchainProfile.toXDR()) === b.profileHash, "ProfileChanged");
-  assert(
-    scValToNative(
-      await simulateRead(server, b, owner, b.profile.vault.address, "decimals"),
-    ) === b.shareDecimals,
-    "ShareDecimals",
-  );
+  assert(scValToNative(shareDecimals) === b.shareDecimals, "ShareDecimals");
   const account = await server.getAccountEntry(owner);
   const thresholds = account.thresholds.toBytes();
   assert(
@@ -176,7 +180,7 @@ export async function shareBalance(
 ): Promise<string> {
   return String(
     scValToNative(
-      await simulateRead(server, b, owner, b.profile.vault.address, "balance", [
+      await readContract(server, b, owner, b.profile.vault.address, "balance", [
         Address.fromString(owner).toScVal(),
       ]),
     ),

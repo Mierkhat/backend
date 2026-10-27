@@ -2,8 +2,8 @@
   {
     "environment": "testnet",
     "epoch": "integration-fixture-v1",
-    "enabled": false,
-    "reviewed": false,
+    "enabled": true,
+    "reviewed": true,
     "networkPassphrase": "Test SDF Network ; September 2015",
     "guard": "CA42L7LDVJMI2BXBNRURXF6K6MVCTBZGND6RP5NYFEGIGWR3HTLNTT74",
     "guardWasmHash": "515bcffd6ee75c51cf4ff65b054751e562a5f6ad8814cce4c9b9572942e91269",
@@ -60,7 +60,7 @@
         "decimals": 7
       }
     ],
-    "vaultName": "Mierkhat testnet fixture",
+    "vaultName": "Mierkhat testnet vault",
     "shareDecimals": 7,
     "feeCeilingStroops": "10000000"
   }

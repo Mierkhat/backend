@@ -34,7 +34,7 @@ export class Store {
   ) {
     if (key.length !== 32) throw Error("PAYLOAD_KEY must be 32 bytes");
   }
-  private seal(value: string, aad: string): Buffer {
+  seal(value: string, aad: string): Buffer {
     const iv = randomBytes(12),
       cipher = createCipheriv("aes-256-gcm", this.key, iv);
     cipher.setAAD(Buffer.from(aad));

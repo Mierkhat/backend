@@ -6,10 +6,13 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { createServer } from "node:net";
 import EmbeddedPostgres from "embedded-postgres";
 import { Pool } from "pg";
-import { inspectSigned } from "@mierkhat/sdk";
+import { inspectSigned, bundleSchema, type SetupReview } from "@mierkhat/sdk";
 import { sdkFixture } from "../sdk/src/test-fixture.js";
 import { Store } from "../src/store.js";
 import { createApp } from "../src/app.js";
+import { SetupService } from "../src/setup.js";
+import actualSetup from "../sdk/fixtures/testnet-setup.json" with { type: "json" };
+import registry from "../sdk/deployments/index.json" with { type: "json" };
 import { Providers } from "../src/providers.js";
 let postgres: EmbeddedPostgres, pool: Pool, store: Store, directory: string;
 beforeAll(async () => {
@@ -55,7 +58,7 @@ afterAll(async () => {
 });
 beforeEach(async () => {
   await pool.query(
-    "TRUNCATE reviews,attempts,submission_keys,signed_payloads,worker_leases CASCADE",
+    "TRUNCATE reviews,attempts,submission_keys,signed_payloads,worker_leases,setup_jobs CASCADE",
   );
 });
 function attempt() {
@@ -230,5 +233,48 @@ describe("R04/R06/R07 durable PostgreSQL tracking", () => {
     } finally {
       await app.close();
     }
+  });
+});
+
+describe("real PostgreSQL setup job durability", () => {
+  it("commits encrypted exact setup bytes before submission and deduplicates concurrent records", async () => {
+    const bundle = bundleSchema.parse(registry[0]),
+      providers = new Providers(
+        { testnet: ["https://soroban-testnet.stellar.org"] },
+        { testnet: bundle.networkPassphrase },
+      ),
+      service = new SetupService(store, providers, bundle),
+      a = actualSetup.find((a) => a.review.draft.kind === "deposit")!;
+    const hashes = await Promise.all([
+      service.record(a.signedXdr, a.review as SetupReview),
+      service.record(a.signedXdr, a.review as SetupReview),
+    ]);
+    expect(hashes).toEqual([a.hash, a.hash]);
+    const rows = (await pool.query("SELECT * FROM setup_jobs")).rows;
+    expect(rows).toHaveLength(1);
+    expect(rows[0].state).toBe("recorded");
+    expect(rows[0].encrypted.toString()).not.toContain(a.signedXdr);
+    expect(store.unseal(rows[0].encrypted, "setup:" + a.hash)).toBe(
+      a.signedXdr,
+    );
+    expect(() =>
+      store.unseal(rows[0].encrypted, "setup:" + "00".repeat(32)),
+    ).toThrow();
+  });
+  it("refuses a mutated setup job before any durable write", async () => {
+    const bundle = bundleSchema.parse(registry[0]),
+      providers = new Providers(
+        { testnet: [] },
+        { testnet: bundle.networkPassphrase },
+      ),
+      service = new SetupService(store, providers, bundle),
+      a = structuredClone(
+        actualSetup.find((a) => a.review.draft.kind === "deposit")!,
+      );
+    a.review.draft.amountsRaw[0] = "1";
+    await expect(
+      service.record(a.signedXdr, a.review as SetupReview),
+    ).rejects.toThrow();
+    expect((await pool.query("SELECT 1 FROM setup_jobs")).rowCount).toBe(0);
   });
 });

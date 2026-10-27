@@ -4,6 +4,12 @@ import rateLimit from "@fastify/rate-limit";
 import { z } from "zod";
 import {
   MierkhatError,
+  accountState,
+  networkState,
+  quoteExit,
+  prepareSetup,
+  verifySetupSigned,
+  amountSchema,
   accountSchema,
   assert,
   decodeReceipt,
@@ -21,6 +27,7 @@ import {
   type ExitDraft,
 } from "@mierkhat/sdk";
 import { Conflict, type Store } from "./store.js";
+import type { SetupService } from "./setup.js";
 import type { Providers } from "./providers.js";
 const domain = z
   .object({ environment: environmentSchema, epoch: z.string().min(1).max(80) })
@@ -41,6 +48,7 @@ export async function createApp(options: {
   providers: Providers;
   bundles: DeploymentBundle[];
   origins: string[];
+  setup?: SetupService;
 }) {
   const { store, providers } = options;
   const knownBundles = options.bundles.map((b) => validateBundle(b, "read"));
@@ -249,6 +257,118 @@ export async function createApp(options: {
     }
   });
   app.get("/v1/environments", async () => bundles);
+  const testnet = () => bundle("testnet");
+  let networkCache:
+    | { at: number; value: Awaited<ReturnType<typeof networkState>> }
+    | undefined;
+  app.get("/v1/network", async () => {
+    if (networkCache && Date.now() - networkCache.at < 10000)
+      return networkCache.value;
+    const value = await providers.run("testnet", (s) =>
+      networkState(testnet(), s),
+    );
+    networkCache = { at: Date.now(), value };
+    return value;
+  });
+  app.get("/v1/accounts/:owner", async (req) => {
+    const { owner } = z.object({ owner: accountSchema }).parse(req.params);
+    return providers.run("testnet", (s) => accountState(testnet(), s, owner));
+  });
+  app.post(
+    "/v1/exit/quote",
+    { config: { rateLimit: { max: 30, timeWindow: "1 minute" } } },
+    async (req) => {
+      const body = z
+        .object({ owner: accountSchema, shares: amountSchema })
+        .strict()
+        .parse(req.body);
+      return providers.run("testnet", (s) =>
+        quoteExit(testnet(), s, body.owner, body.shares),
+      );
+    },
+  );
+  const setupDraft = z
+    .object({
+      kind: z.enum(["trustlines", "deposit"]),
+      owner: accountSchema,
+      amountsRaw: z.array(amountSchema).max(2),
+      minimumsRaw: z.array(amountSchema).max(2),
+      trustAssets: z.array(z.string().max(56)).max(4),
+    })
+    .strict();
+  app.post(
+    "/v1/setup/prepare",
+    { config: { rateLimit: { max: 15, timeWindow: "1 minute" } } },
+    async (req) => {
+      const d = setupDraft.parse(req.body);
+      return providers.run("testnet", (s) => prepareSetup(d, testnet(), s));
+    },
+  );
+  app.post("/v1/setup/submit", async (req, reply) => {
+    assert(options.setup, "SetupUnavailable");
+    const body = z
+      .object({
+        signedXdr: z.string().max(349528),
+        review: z
+          .object({
+            draft: setupDraft,
+            environment: z.literal("testnet"),
+            epoch: z.string().max(80),
+            transactionXdr: z.string().max(349528),
+            envelopeDigest: hashSchema,
+            authDigest: hashSchema,
+            preparedLedger: z.number().int().positive(),
+            preparedTime: amountSchema,
+            expectedDepositedRaw: z.array(amountSchema).max(2),
+            expectedSharesRaw: amountSchema,
+            feeMaximumStroops: amountSchema,
+          })
+          .strict(),
+      })
+      .strict()
+      .parse(req.body);
+    const hash = await options.setup.record(body.signedXdr, body.review);
+    return reply.code(202).send({ hash, state: "recorded" });
+  });
+  app.post(
+    "/v1/testnet/faucet",
+    { config: { rateLimit: { max: 5, timeWindow: "1 minute" } } },
+    async (req, reply) => {
+      assert(options.setup, "SetupUnavailable");
+      const { owner } = z
+        .object({ owner: accountSchema })
+        .strict()
+        .parse(req.body);
+      return reply.code(202).send(await options.setup.faucet(owner));
+    },
+  );
+  app.post(
+    "/v1/testnet/fund",
+    { config: { rateLimit: { max: 3, timeWindow: "1 minute" } } },
+    async (req) => {
+      const { owner } = z
+        .object({ owner: accountSchema })
+        .strict()
+        .parse(req.body);
+      const a = await providers.run("testnet", (s) =>
+        accountState(testnet(), s, owner),
+      );
+      if (!a.funded) {
+        const response = await fetch(
+          "https://friendbot.stellar.org/?addr=" + encodeURIComponent(owner),
+          { signal: AbortSignal.timeout(20000) },
+        );
+        assert(response.ok, "Friendbot", "funding.unavailable");
+      }
+      return providers.run("testnet", (s) => accountState(testnet(), s, owner));
+    },
+  );
+  app.get("/v1/setup/transactions/:hash", async (req) => {
+    assert(options.setup, "SetupUnavailable");
+    const { hash } = z.object({ hash: hashSchema }).parse(req.params);
+    return options.setup.status(hash);
+  });
+
   app.get("/v1/profiles/:profileHash", async (req, reply) => {
     const q = query.parse(req.query);
     const p = z.object({ profileHash: hashSchema }).parse(req.params);
@@ -328,6 +448,11 @@ export async function createApp(options: {
   app.get("/v1/transactions/:hash", async (req, reply) => {
     const q = query.parse(req.query);
     const p = z.object({ hash: hashSchema }).parse(req.params);
+    const setupRow = await store.pool.query(
+      "SELECT 1 FROM setup_jobs WHERE tx_hash=$1",
+      [p.hash],
+    );
+    if (setupRow.rowCount && options.setup) return options.setup.status(p.hash);
     const row = await store.getAttempt(q.environment, p.hash);
     if (row?.state === "succeeded" || row?.state === "failed")
       return row.observation;
