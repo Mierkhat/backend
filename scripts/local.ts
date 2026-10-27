@@ -3,8 +3,14 @@ import { randomBytes } from "node:crypto";
 import { mkdir, readFile, writeFile, access } from "node:fs/promises";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { existsSync } from "node:fs";
 import EmbeddedPostgres from "embedded-postgres";
-const root = resolve(fileURLToPath(new URL("../..", import.meta.url))),
+const parent = resolve(fileURLToPath(new URL("../..", import.meta.url))),
+  // Preserve the combined workspace's existing database; standalone clones keep
+  // local credentials and data inside their own ignored repository directory.
+  root = existsSync(resolve(parent, "scripts/export_facet.py"))
+    ? parent
+    : resolve(fileURLToPath(new URL("..", import.meta.url))),
   dir = resolve(root, ".tooling/local");
 await mkdir(dir, { recursive: true, mode: 0o700 });
 let config: { password: string; payloadKey: string };

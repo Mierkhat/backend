@@ -1,0 +1,711 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Mierkhat API",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/v1/network": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Current verified testnet ledger and vault totals"
+          }
+        }
+      }
+    },
+    "/v1/accounts/{owner}": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "owner",
+            "required": true,
+            "schema": {
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Actual account funding, trustline, asset and vault share state"
+          }
+        }
+      }
+    },
+    "/v1/exit/quote": {
+      "post": {
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "owner": {
+                    "type": "string"
+                  },
+                  "shares": {
+                    "type": "string",
+                    "maxLength": 39,
+                    "pattern": "^(0|[1-9][0-9]*)$"
+                  }
+                },
+                "required": [
+                  "owner",
+                  "shares"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Current on-chain withdrawal and direct conversion quote"
+          }
+        }
+      }
+    },
+    "/v1/setup/prepare": {
+      "post": {
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "trustlines",
+                      "deposit",
+                      "restore"
+                    ]
+                  },
+                  "owner": {
+                    "type": "string"
+                  },
+                  "amountsRaw": {
+                    "maxItems": 2,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "maxLength": 39,
+                      "pattern": "^(0|[1-9][0-9]*)$"
+                    }
+                  },
+                  "minimumsRaw": {
+                    "maxItems": 2,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "maxLength": 39,
+                      "pattern": "^(0|[1-9][0-9]*)$"
+                    }
+                  },
+                  "trustAssets": {
+                    "maxItems": 4,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "maxLength": 56
+                    }
+                  }
+                },
+                "required": [
+                  "kind",
+                  "owner",
+                  "amountsRaw",
+                  "minimumsRaw",
+                  "trustAssets"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Unsigned trustline, deposit or explicit restoration review requiring independent verification"
+          }
+        }
+      }
+    },
+    "/v1/setup/submit": {
+      "post": {
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "signedXdr": {
+                    "type": "string",
+                    "maxLength": 349528
+                  },
+                  "review": {
+                    "type": "object",
+                    "properties": {
+                      "draft": {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "trustlines",
+                              "deposit",
+                              "restore"
+                            ]
+                          },
+                          "owner": {
+                            "type": "string"
+                          },
+                          "amountsRaw": {
+                            "maxItems": 2,
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "maxLength": 39,
+                              "pattern": "^(0|[1-9][0-9]*)$"
+                            }
+                          },
+                          "minimumsRaw": {
+                            "maxItems": 2,
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "maxLength": 39,
+                              "pattern": "^(0|[1-9][0-9]*)$"
+                            }
+                          },
+                          "trustAssets": {
+                            "maxItems": 4,
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "maxLength": 56
+                            }
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "owner",
+                          "amountsRaw",
+                          "minimumsRaw",
+                          "trustAssets"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "environment": {
+                        "type": "string",
+                        "const": "testnet"
+                      },
+                      "epoch": {
+                        "type": "string",
+                        "maxLength": 80
+                      },
+                      "transactionXdr": {
+                        "type": "string",
+                        "maxLength": 349528
+                      },
+                      "envelopeDigest": {
+                        "type": "string",
+                        "pattern": "^[a-f0-9]{64}$"
+                      },
+                      "authDigest": {
+                        "type": "string",
+                        "pattern": "^[a-f0-9]{64}$"
+                      },
+                      "preparedLedger": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "preparedTime": {
+                        "type": "string",
+                        "maxLength": 39,
+                        "pattern": "^(0|[1-9][0-9]*)$"
+                      },
+                      "expectedDepositedRaw": {
+                        "maxItems": 2,
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "maxLength": 39,
+                          "pattern": "^(0|[1-9][0-9]*)$"
+                        }
+                      },
+                      "expectedSharesRaw": {
+                        "type": "string",
+                        "maxLength": 39,
+                        "pattern": "^(0|[1-9][0-9]*)$"
+                      },
+                      "feeMaximumStroops": {
+                        "type": "string",
+                        "maxLength": 39,
+                        "pattern": "^(0|[1-9][0-9]*)$"
+                      }
+                    },
+                    "required": [
+                      "draft",
+                      "environment",
+                      "epoch",
+                      "transactionXdr",
+                      "envelopeDigest",
+                      "authDigest",
+                      "preparedLedger",
+                      "preparedTime",
+                      "expectedDepositedRaw",
+                      "expectedSharesRaw",
+                      "feeMaximumStroops"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "signedXdr",
+                  "review"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Exact verified signed bytes durably recorded before send"
+          }
+        }
+      }
+    },
+    "/v1/testnet/fund": {
+      "post": {
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "owner": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "owner"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Actual funded testnet account state"
+          }
+        }
+      }
+    },
+    "/v1/testnet/faucet": {
+      "post": {
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "owner": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "owner"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Durably recorded actual token issuance hash and allocation"
+          }
+        }
+      }
+    },
+    "/v1/setup/transactions/{hash}": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "hash",
+            "required": true,
+            "schema": {
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Committed transaction observation or explicit unknown"
+          }
+        }
+      }
+    },
+    "/v1/exit/prepare": {
+      "post": {
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "environment": {
+                    "type": "string",
+                    "enum": [
+                      "local",
+                      "testnet",
+                      "mainnet"
+                    ]
+                  },
+                  "epoch": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  },
+                  "revision": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "intent": {
+                    "type": "object",
+                    "properties": {
+                      "schema": {
+                        "type": "number",
+                        "const": 1
+                      },
+                      "network_id": {
+                        "type": "string",
+                        "pattern": "^[a-f0-9]{64}$"
+                      },
+                      "guard": {
+                        "type": "string"
+                      },
+                      "profile_hash": {
+                        "type": "string",
+                        "pattern": "^[a-f0-9]{64}$"
+                      },
+                      "intent_id": {
+                        "type": "string",
+                        "pattern": "^[a-f0-9]{64}$"
+                      },
+                      "owner": {
+                        "type": "string"
+                      },
+                      "recipient": {
+                        "type": "string"
+                      },
+                      "shares": {
+                        "type": "string",
+                        "maxLength": 39,
+                        "pattern": "^(0|[1-9][0-9]*)$"
+                      },
+                      "min_withdraw": {
+                        "minItems": 1,
+                        "maxItems": 2,
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "maxLength": 39,
+                          "pattern": "^(0|[1-9][0-9]*)$"
+                        }
+                      },
+                      "min_swap": {
+                        "minItems": 1,
+                        "maxItems": 2,
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "maxLength": 39,
+                          "pattern": "^(0|[1-9][0-9]*)$"
+                        }
+                      },
+                      "min_receive": {
+                        "type": "string",
+                        "maxLength": 39,
+                        "pattern": "^(0|[1-9][0-9]*)$"
+                      },
+                      "valid_before_time": {
+                        "type": "string",
+                        "maxLength": 20,
+                        "pattern": "^[1-9][0-9]*$"
+                      },
+                      "valid_before_ledger": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 4294967295
+                      }
+                    },
+                    "required": [
+                      "schema",
+                      "network_id",
+                      "guard",
+                      "profile_hash",
+                      "intent_id",
+                      "owner",
+                      "recipient",
+                      "shares",
+                      "min_withdraw",
+                      "min_swap",
+                      "min_receive",
+                      "valid_before_time",
+                      "valid_before_ledger"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "environment",
+                  "epoch",
+                  "revision",
+                  "intent"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Unsigned candidate requiring independent SDK verification"
+          }
+        }
+      }
+    },
+    "/v1/exit/submit": {
+      "post": {
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 16,
+              "maxLength": 200
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "environment": {
+                    "type": "string",
+                    "enum": [
+                      "local",
+                      "testnet",
+                      "mainnet"
+                    ]
+                  },
+                  "epoch": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  },
+                  "signedXdr": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 349528
+                  },
+                  "claimedHash": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  },
+                  "reviewId": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "environment",
+                  "epoch",
+                  "signedXdr",
+                  "claimedHash",
+                  "reviewId"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Recorded for tracking, not a ledger result"
+          }
+        }
+      }
+    },
+    "/v1/environments": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Enabled pinned deployments"
+          }
+        }
+      }
+    },
+    "/v1/profiles/{profileHash}": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "profileHash",
+            "required": true,
+            "schema": {
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          },
+          {
+            "in": "query",
+            "name": "environment",
+            "required": true,
+            "schema": {
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "type": "string",
+              "enum": [
+                "local",
+                "testnet",
+                "mainnet"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Immutable public deployment metadata"
+          },
+          "404": {
+            "description": "No supported profile"
+          }
+        }
+      }
+    },
+    "/v1/reviews/{reviewId}": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "reviewId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "query",
+            "name": "environment",
+            "required": true,
+            "schema": {
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "type": "string",
+              "enum": [
+                "local",
+                "testnet",
+                "mainnet"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Unsigned candidate"
+          },
+          "404": {
+            "description": "Unknown or wrong environment"
+          },
+          "410": {
+            "description": "Expired review"
+          }
+        }
+      }
+    },
+    "/v1/transactions/{hash}": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "hash",
+            "required": true,
+            "schema": {
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          },
+          {
+            "in": "query",
+            "name": "environment",
+            "required": true,
+            "schema": {
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "type": "string",
+              "enum": [
+                "local",
+                "testnet",
+                "mainnet"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Hash observation with verified receipt when available"
+          }
+        }
+      }
+    },
+    "/v1/health": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Ready"
+          },
+          "503": {
+            "description": "Database unavailable"
+          }
+        }
+      }
+    }
+  }
+}
