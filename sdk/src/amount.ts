@@ -20,6 +20,7 @@ export function parseAmount(text: string, decimals: number): string {
   if (!Number.isInteger(decimals) || decimals < 0 || decimals > 38)
     throw new MierkhatError("Decimals", "input.invalid");
   const value = text.trim();
+  if(value.length>80)throw new MierkhatError("Overflow","input.too_large");
   if (!/^(0|[1-9][0-9]*)(\.[0-9]+)?$/.test(value))
     throw new MierkhatError("BadAmount", "input.invalid");
   const [whole = "", fraction = ""] = value.split(".");

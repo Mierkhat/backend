@@ -7,3 +7,4 @@ export * from "./controller.js";
 export type * as ContractTypes from "./generated/types.js";
 export * from "./submission.js";
 export * from "./sign.js";
+export * from './recovery.js';
