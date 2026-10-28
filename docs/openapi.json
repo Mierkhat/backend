@@ -5,6 +5,407 @@
     "version": "0.1.0"
   },
   "paths": {
+    "/v1/withdrawals/readiness": {
+      "post": {
+        "summary": "Test a supported position's complete withdrawal",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "owner": {
+                    "type": "string"
+                  },
+                  "epoch": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  },
+                  "movementBps": {
+                    "default": 50,
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 500
+                  }
+                },
+                "required": [
+                  "owner",
+                  "epoch",
+                  "movementBps"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Observed result; unknown data is never an executable guarantee"
+          },
+          "422": {
+            "description": "Unsupported route, invalid positive amount or rejected preflight"
+          },
+          "503": {
+            "description": "Provider unavailable"
+          }
+        }
+      }
+    },
+    "/v1/withdrawals/plan": {
+      "post": {
+        "summary": "Find a tested share spend for a receiving target",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "owner": {
+                    "type": "string"
+                  },
+                  "epoch": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  },
+                  "movementBps": {
+                    "default": 50,
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 500
+                  },
+                  "targetRaw": {
+                    "type": "string",
+                    "maxLength": 39,
+                    "pattern": "^(0|[1-9][0-9]*)$"
+                  }
+                },
+                "required": [
+                  "owner",
+                  "epoch",
+                  "movementBps",
+                  "targetRaw"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Observed result; unknown data is never an executable guarantee"
+          },
+          "422": {
+            "description": "Unsupported route, invalid positive amount or rejected preflight"
+          },
+          "503": {
+            "description": "Provider unavailable"
+          }
+        }
+      }
+    },
+    "/v1/migrations/quote": {
+      "post": {
+        "summary": "Simulate a bounded partial cross-asset migration",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "owner": {
+                    "type": "string"
+                  },
+                  "epoch": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  },
+                  "movementBps": {
+                    "default": 50,
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 500
+                  },
+                  "sharesRaw": {
+                    "type": "string",
+                    "maxLength": 39,
+                    "pattern": "^(0|[1-9][0-9]*)$"
+                  }
+                },
+                "required": [
+                  "owner",
+                  "epoch",
+                  "movementBps",
+                  "sharesRaw"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Observed result; unknown data is never an executable guarantee"
+          },
+          "422": {
+            "description": "Unsupported route, invalid positive amount or rejected preflight"
+          },
+          "503": {
+            "description": "Provider unavailable"
+          }
+        }
+      }
+    },
+    "/v1/watches": {
+      "post": {
+        "summary": "Create a seven-day opt-in in-app watch",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "owner": {
+                    "type": "string"
+                  },
+                  "epoch": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  },
+                  "movementBps": {
+                    "default": 50,
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 500
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "exit",
+                      "migration"
+                    ]
+                  },
+                  "sharesRaw": {
+                    "type": "string",
+                    "maxLength": 39,
+                    "pattern": "^(0|[1-9][0-9]*)$"
+                  },
+                  "minimumRaw": {
+                    "type": "string",
+                    "maxLength": 39,
+                    "pattern": "^(0|[1-9][0-9]*)$"
+                  }
+                },
+                "required": [
+                  "owner",
+                  "epoch",
+                  "movementBps",
+                  "kind",
+                  "sharesRaw",
+                  "minimumRaw"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Observed result; unknown data is never an executable guarantee"
+          },
+          "422": {
+            "description": "Unsupported route, invalid positive amount or rejected preflight"
+          },
+          "503": {
+            "description": "Provider unavailable"
+          }
+        }
+      },
+      "parameters": [
+        {
+          "name": "X-Watch-Key",
+          "in": "header",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "description": "Private browser capability; never put this in a URL"
+        }
+      ]
+    },
+    "/v1/watches/{id}": {
+      "get": {
+        "summary": "Read a watch and its notifications",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Watch-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "description": "Private browser capability; never put this in a URL"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Private watch state"
+          },
+          "404": {
+            "description": "Missing, expired or incorrect capability"
+          }
+        }
+      }
+    },
+    "/v1/watches/{id}/remove": {
+      "post": {
+        "summary": "Delete watch and notifications",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Watch-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "description": "Private browser capability; never put this in a URL"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Removed"
+          },
+          "404": {
+            "description": "Missing or incorrect capability"
+          }
+        }
+      }
+    },
+    "/v1/watches/{id}/rearm": {
+      "post": {
+        "summary": "Explicitly rearm a condition notification",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Watch-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "description": "Private browser capability; never put this in a URL"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Rearmed"
+          },
+          "409": {
+            "description": "Missing or currently leased"
+          }
+        }
+      }
+    },
+    "/v1/watches/{id}/seen": {
+      "post": {
+        "summary": "Mark a watch notification read",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "notification": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  }
+                },
+                "required": [
+                  "notification"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Observed result; unknown data is never an executable guarantee"
+          },
+          "422": {
+            "description": "Unsupported route, invalid positive amount or rejected preflight"
+          },
+          "503": {
+            "description": "Provider unavailable"
+          }
+        }
+      },
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "X-Watch-Key",
+          "in": "header",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "description": "Private browser capability; never put this in a URL"
+        }
+      ]
+    },
     "/v1/network": {
       "get": {
         "responses": {
@@ -459,6 +860,42 @@
                         "type": "string",
                         "maxLength": 39,
                         "pattern": "^(0|[1-9][0-9]*)$"
+                      },
+                      "migration": {
+                        "type": "object",
+                        "properties": {
+                          "convert_inputs": {
+                            "minItems": 1,
+                            "maxItems": 2,
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "maxLength": 39,
+                              "pattern": "^(0|[1-9][0-9]*)$"
+                            }
+                          },
+                          "min_deposit": {
+                            "minItems": 1,
+                            "maxItems": 2,
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "maxLength": 39,
+                              "pattern": "^(0|[1-9][0-9]*)$"
+                            }
+                          },
+                          "min_destination_shares": {
+                            "type": "string",
+                            "maxLength": 39,
+                            "pattern": "^(0|[1-9][0-9]*)$"
+                          }
+                        },
+                        "required": [
+                          "convert_inputs",
+                          "min_deposit",
+                          "min_destination_shares"
+                        ],
+                        "additionalProperties": false
                       },
                       "min_withdraw": {
                         "minItems": 1,

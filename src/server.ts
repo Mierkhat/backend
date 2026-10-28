@@ -6,6 +6,7 @@ import { Store } from "./store.js";
 import { Providers } from "./providers.js";
 import { Keypair } from "@stellar/stellar-sdk";
 import { SetupService } from "./setup.js";
+import { WatchService } from "./watches.js";
 import { reconcileOne } from "./worker.js";
 const databaseUrl = process.env.DATABASE_URL;
 const payloadKey = process.env.PAYLOAD_KEY;
@@ -60,6 +61,11 @@ const setup = liveBundle
       issuer,
     )
   : undefined;
+const watches = new WatchService(
+  pool,
+  providers,
+  bundles.filter((b) => b.enabled),
+);
 const app = await createApp({
   setup,
   store,
@@ -74,6 +80,7 @@ const timer = setInterval(() => {
   active = Promise.all([
     reconcileOne(store, providers, bundles),
     setup?.reconcile(),
+    watches.run(),
   ])
     .catch(() => {})
     .finally(() => {
@@ -82,6 +89,7 @@ const timer = setInterval(() => {
 }, 1000);
 const prune = setInterval(() => {
   void store.prune().catch(() => {});
+  void watches.prune().catch(() => {});
 }, 60000);
 await app.listen({
   host: process.env.HOST ?? "127.0.0.1",

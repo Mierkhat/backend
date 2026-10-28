@@ -13,6 +13,7 @@ import { createApp } from "../src/app.js";
 import { SetupService } from "../src/setup.js";
 import actualSetup from "../sdk/fixtures/testnet-setup.json" with { type: "json" };
 import registry from "../sdk/deployments/index.json" with { type: "json" };
+import { WatchService } from "../src/watches.js";
 import { Providers } from "../src/providers.js";
 let postgres: EmbeddedPostgres, pool: Pool, store: Store, directory: string;
 beforeAll(async () => {
@@ -58,7 +59,7 @@ afterAll(async () => {
 });
 beforeEach(async () => {
   await pool.query(
-    "TRUNCATE reviews,attempts,submission_keys,signed_payloads,worker_leases,setup_jobs CASCADE",
+    "TRUNCATE withdrawal_watches,reviews,attempts,submission_keys,signed_payloads,worker_leases,setup_jobs CASCADE",
   );
 });
 function attempt() {
@@ -387,5 +388,140 @@ describe("real PostgreSQL setup job durability", () => {
       service.record(a.signedXdr, a.review as SetupReview),
     ).rejects.toThrow();
     expect((await pool.query("SELECT 1 FROM setup_jobs")).rowCount).toBe(0);
+  });
+});
+
+describe("durable private withdrawal watches", () => {
+  function service() {
+    const b = sdkFixture().bundle;
+    return { service: new WatchService(pool, new Providers({}, {}), [b]), b };
+  }
+  it("isolates capability access, persists across instances and deletes observations", async () => {
+    const { service: s, b } = service(),
+      key = randomBytes(32).toString("hex");
+    const { id } = await s.create(
+      {
+        owner: sdkFixture().draft.intent.owner,
+        epoch: b.epoch,
+        kind: "exit",
+        sharesRaw: "100",
+        minimumRaw: "1",
+        movementBps: 50,
+      },
+      key,
+    );
+    expect(await s.read(id, randomBytes(32).toString("hex"))).toBeUndefined();
+    expect((await service().service.read(id, key))?.watch.id).toBe(id);
+    const stored = (
+      await pool.query(
+        "SELECT capability_hash FROM withdrawal_watches WHERE id=$1",
+        [id],
+      )
+    ).rows[0];
+    expect(stored.capability_hash).not.toBe(key);
+    expect(await s.remove(id, randomBytes(32).toString("hex"))).toBe(false);
+    expect(await s.remove(id, key)).toBe(true);
+    expect(await s.read(id, key)).toBeUndefined();
+  });
+  it("leases once and emits once per real eligibility transition; unknown does not rearm", async () => {
+    const { service: s, b } = service(),
+      key = randomBytes(32).toString("hex");
+    const { id } = await s.create(
+      {
+        owner: sdkFixture().draft.intent.owner,
+        epoch: b.epoch,
+        kind: "exit",
+        sharesRaw: "100",
+        minimumRaw: "1",
+        movementBps: 50,
+      },
+      key,
+    );
+    const claims = (
+      await Promise.all([s.claim(), service().service.claim()])
+    ).filter(Boolean);
+    expect(claims).toHaveLength(1);
+    expect(
+      await s.record(id, randomUUID(), {
+        state: "met",
+        checkedAt: new Date().toISOString(),
+        reason: "FullFlowTested",
+      }),
+    ).toBe(false);
+    const record = async (state: "met" | "unmet" | "unknown") => {
+      await pool.query(
+        "UPDATE withdrawal_watches SET next_check_at=now(),lease_until=NULL WHERE id=$1",
+        [id],
+      );
+      const row = await s.claim();
+      expect(row.id).toBe(id);
+      expect(
+        await s.record(id, row.lease_token, {
+          state,
+          checkedAt: new Date().toISOString(),
+          reason: state === "unknown" ? "ReadUnavailable" : "FullFlowTested",
+        }),
+      ).toBe(true);
+    };
+    await s.record(id, claims[0].lease_token, {
+      state: "met",
+      checkedAt: new Date().toISOString(),
+      reason: "FullFlowTested",
+    });
+    await record("met");
+    await record("unknown");
+    await record("met");
+    expect((await s.read(id, key))!.notifications).toHaveLength(1);
+    await record("unmet");
+    await record("met");
+    const result = (await s.read(id, key))!;
+    expect(result.notifications).toHaveLength(2);
+    expect(await s.seen(id, key, result.notifications[0].id)).toBe(true);
+    expect((await s.read(id, key))!.notifications[0].seen_at).toBeTruthy();
+    expect(await s.remove(id, key)).toBe(true);
+    expect(
+      (
+        await pool.query(
+          "SELECT count(*) FROM withdrawal_notifications WHERE watch_id=$1",
+          [id],
+        )
+      ).rows[0].count,
+    ).toBe("0");
+  });
+  it("recovers expired leases and excludes expired watches", async () => {
+    const { service: s, b } = service(),
+      key = randomBytes(32).toString("hex");
+    const { id } = await s.create(
+      {
+        owner: sdkFixture().draft.intent.owner,
+        epoch: b.epoch,
+        kind: "exit",
+        sharesRaw: "100",
+        minimumRaw: "1",
+        movementBps: 50,
+      },
+      key,
+    );
+    const old = await s.claim();
+    await pool.query(
+      "UPDATE withdrawal_watches SET lease_until=now()-interval '1 second' WHERE id=$1",
+      [id],
+    );
+    const current = await service().service.claim();
+    expect(current.lease_token).not.toBe(old.lease_token);
+    expect(
+      await s.record(id, old.lease_token, {
+        state: "met",
+        checkedAt: new Date().toISOString(),
+        reason: "FullFlowTested",
+      }),
+    ).toBe(false);
+    await pool.query(
+      "UPDATE withdrawal_watches SET expires_at=now()-interval '1 second' WHERE id=$1",
+      [id],
+    );
+    expect(await s.read(id, key)).toBeUndefined();
+    expect(await s.claim()).toBeUndefined();
+    await s.prune();
   });
 });

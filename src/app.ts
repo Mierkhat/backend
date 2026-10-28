@@ -1,4 +1,6 @@
 import Fastify from "fastify";
+import { exitToolPaths, registerExitTools } from "./tools.js";
+import { WatchService } from "./watches.js";
 import cors from "@fastify/cors";
 import rateLimit from "@fastify/rate-limit";
 import { z } from "zod";
@@ -103,7 +105,7 @@ export async function createApp(options: {
   await app.register(cors, {
     origin: options.origins,
     methods: ["GET", "POST"],
-    allowedHeaders: ["Content-Type", "Idempotency-Key"],
+    allowedHeaders: ["Content-Type", "Idempotency-Key", "X-Watch-Key"],
   });
   await app.register(rateLimit, { max: 60, timeWindow: "1 minute" });
   app.addHook("onSend", async (_req, reply) => {
@@ -164,6 +166,7 @@ export async function createApp(options: {
     openapi: "3.1.0",
     info: { title: "Mierkhat API", version: "0.1.0" },
     paths: {
+      ...exitToolPaths(),
       "/v1/network": {
         get: {
           responses: {
@@ -626,5 +629,11 @@ export async function createApp(options: {
       throw error;
     }
   });
+  await registerExitTools(
+    app,
+    providers,
+    bundles,
+    new WatchService(store.pool, providers, bundles),
+  );
   return app;
 }
