@@ -13,6 +13,8 @@ import {
   intentScVal,
   networkId,
   profileHash,
+  bundleProfileHash,
+  rootMethod,
 } from "./codec.js";
 import {
   bundleSchema,
@@ -43,7 +45,7 @@ export function validateBundle(
   );
   assert(
     networkId(b.networkPassphrase) === b.profile.network_id &&
-      profileHash(b.profile) === b.profileHash,
+      bundleProfileHash(b) === b.profileHash,
     "ProfileHash",
   );
   const { profile: p } = b;
@@ -67,7 +69,32 @@ export function validateBundle(
       a.asset === p.settlement ? a.pair === null : a.pair !== null,
       "PairShape",
     );
-  const required = new Set([...assets, p.settlement]);
+  if (b.migration) {
+    const m = b.migration;
+    assert(
+      !identities.includes(m.destination.address) &&
+        !assets.includes(m.destination.address) &&
+        m.destination.address !== p.settlement,
+      "MigrationAlias",
+    );
+    assert(
+      new Set(m.destination_assets.map((a) => a.asset)).size ===
+        m.destination_assets.length,
+      "MigrationAssets",
+    );
+    for (const a of m.destination_assets)
+      assert(
+        !identities.includes(a.asset) &&
+          a.asset !== m.destination.address &&
+          (a.asset === p.settlement ? a.pair === null : a.pair !== null),
+        "MigrationAssets",
+      );
+  }
+  const required = new Set([
+    ...assets,
+    p.settlement,
+    ...(b.migration?.destination_assets.map((a) => a.asset) ?? []),
+  ]);
   assert(
     b.tokens.length === required.size &&
       new Set(b.tokens.map((t) => t.address)).size === required.size &&
@@ -97,6 +124,28 @@ export function validateIntent(
     "WrongDomain",
   );
   assert(i.owner === i.recipient, "Recipient");
+  assert(!!i.migration === !!b.migration, "MigrationDomain");
+  if (i.migration && b.migration) {
+    const m = i.migration;
+    const assets = b.migration.destination_assets;
+    assert(
+      m.convert_inputs.length === assets.length &&
+        m.min_deposit.length === assets.length,
+      "MigrationVectors",
+    );
+    rawAmount(m.min_destination_shares);
+    let sum = 0n;
+    assets.forEach((a, n) => {
+      rawAmount(m.min_deposit[n]!);
+      const value = rawAmount(m.convert_inputs[n]!, false);
+      assert(
+        a.asset === b.profile.settlement ? value === 0n : value > 0n,
+        "MigrationInput",
+      );
+      sum += value;
+    });
+    assert(sum <= BigInt(i.min_receive), "MigrationBudget");
+  }
   rawAmount(i.shares);
   rawAmount(i.min_receive);
   assert(
@@ -181,7 +230,7 @@ export function verifyEnvelopePolicy(
   const call = op.func.invokeContract;
   assert(
     Address.fromScAddress(call.contractAddress).toString() === b.guard &&
-      call.functionName.toString() === "execute_exit",
+      call.functionName.toString() === rootMethod(b),
     "Root",
   );
   assert(
@@ -279,7 +328,8 @@ export function verifyReview(
   );
   assert(
     candidate.profileHash === b.profileHash &&
-      profileHash(candidate.profile) === b.profileHash &&
+      bundleProfileHash({ ...b, profile: candidate.profile }) ===
+        b.profileHash &&
       candidate.intentHash === intentHash(draft.intent),
     "Digest",
   );

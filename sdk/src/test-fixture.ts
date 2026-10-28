@@ -18,9 +18,11 @@ import {
   intentScVal,
   networkId,
   profileHash,
+  bundleProfileHash,
+  rootMethod,
 } from "./codec.js";
 import type { DeploymentBundle, ExitDraft, Review } from "./model.js";
-export function sdkFixture() {
+export function sdkFixture(migration = false) {
   const address = (n: number) =>
     StrKey.encodeContract(new Uint8Array(32).fill(n));
   const key = Keypair.random();
@@ -58,6 +60,15 @@ export function sdkFixture() {
     shareDecimals: 7,
     feeCeilingStroops: "1000000",
   };
+  if (migration) {
+    bundle.migration = {
+      destination: { address: address(8), wasm_hash: "08".repeat(32) },
+      destination_assets: [{ asset: profile.settlement, pair: null }],
+      destinationName: "Destination",
+      destinationShareDecimals: 7,
+    };
+    bundle.profileHash = bundleProfileHash(bundle);
+  }
   const draft: ExitDraft = {
     environment: "testnet",
     epoch: "fixture",
@@ -71,6 +82,15 @@ export function sdkFixture() {
       owner: key.publicKey(),
       recipient: key.publicKey(),
       shares: "9007199254740993",
+      ...(migration
+        ? {
+            migration: {
+              convert_inputs: ["0"],
+              min_deposit: ["1"],
+              min_destination_shares: "1",
+            },
+          }
+        : {}),
       min_withdraw: ["1"],
       min_swap: ["1"],
       min_receive: "1",
@@ -79,7 +99,7 @@ export function sdkFixture() {
     },
   };
   const raw = new Contract(bundle.guard).call(
-    "execute_exit",
+    rootMethod(bundle),
     intentScVal(draft.intent),
   );
   if (

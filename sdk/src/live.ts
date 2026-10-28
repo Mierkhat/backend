@@ -85,12 +85,13 @@ export async function accountPositions(
   server: rpc.Server,
   owner: string,
 ): Promise<PositionsState> {
-  const first = bundles[0];
+  const routes = bundles.filter(b=>!b.migration);
+  const first = routes[0];
   assert(first, "UnsupportedDeployment", "route.unsupported");
   const account = await accountState(first, server, owner);
   if (!account.funded) return { owner, ledger: account.ledger, positions: [] };
   const vaults = new Map<string, DeploymentBundle[]>();
-  for (const b of bundles) {
+  for (const b of routes) {
     validateBundle(b);
     assert(b.networkPassphrase === first.networkPassphrase, "PositionNetwork");
     const group = vaults.get(b.profile.vault.address) ?? [];
@@ -230,9 +231,10 @@ export async function quoteExit(
   s: rpc.Server,
   owner: string,
   shares: string,
+  deploymentAlreadyChecked = false,
 ): Promise<ExitQuote> {
   rawAmount(shares);
-  await loadDeployment(b, s, owner);
+  if (!deploymentAlreadyChecked) await loadDeployment(b, s, owner);
   const l = await latestLedger(s);
   const amounts = scValToNative(
     await readContract(

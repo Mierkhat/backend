@@ -7,7 +7,7 @@ import {
   txV1,
   verifyEnvelopePolicy,
 } from "./policy.js";
-import { digest, intentHash, jsonSafe, spec } from "./codec.js";
+import { digest, intentHash, jsonSafe, spec, decodeIntent } from "./codec.js";
 import {
   intentSchema,
   type DeploymentBundle,
@@ -28,13 +28,9 @@ export function inspectSigned(
     op.func.invokeContract.args.length !== 1
   )
     throw new MierkhatError("UnsupportedEnvelope", "failure.authority");
-  const native = spec.scValToNative(
-    op.func.invokeContract.args[0]!,
-    xdr.ScSpecTypeDef.scSpecTypeUdt(
-      new xdr.ScSpecTypeUdt({ name: "ExitIntent" }),
-    ),
+  const intent = intentSchema.parse(
+    decodeIntent(op.func.invokeContract.args[0]!, b),
   );
-  const intent = intentSchema.parse(jsonSafe(native));
   const draft: ExitDraft = {
     environment: b.environment,
     epoch: b.epoch,

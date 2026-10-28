@@ -37,6 +37,21 @@ export const profileSchema = z
   })
   .strict();
 export type RouteProfile = z.infer<typeof profileSchema>;
+export const migrationBoundsSchema = z
+  .object({
+    convert_inputs: z.array(amountSchema).min(1).max(2),
+    min_deposit: z.array(amountSchema).min(1).max(2),
+    min_destination_shares: amountSchema,
+  })
+  .strict();
+export const migrationDeploymentSchema = z
+  .object({
+    destination: codePinSchema,
+    destination_assets: profileSchema.shape.assets,
+    destinationName: z.string().min(1).max(80),
+    destinationShareDecimals: z.number().int().min(0).max(38),
+  })
+  .strict();
 export const intentSchema = z
   .object({
     schema: z.literal(1),
@@ -47,6 +62,7 @@ export const intentSchema = z
     owner: accountSchema,
     recipient: accountSchema,
     shares: amountSchema,
+    migration: migrationBoundsSchema.optional(),
     min_withdraw: z.array(amountSchema).min(1).max(2),
     min_swap: z.array(amountSchema).min(1).max(2),
     min_receive: amountSchema,
@@ -82,6 +98,7 @@ export const bundleSchema = z
       .max(4),
     vaultName: z.string().min(1).max(80),
     shareDecimals: z.number().int().min(0).max(38),
+    migration: migrationDeploymentSchema.optional(),
     feeCeilingStroops: amountSchema,
     reviewed: z.boolean(),
   })
@@ -110,6 +127,8 @@ export interface Review {
   preparedLedger: number;
   preparedTime: string;
   expectedReceiveRaw: string;
+  expectedDestinationSharesRaw?: string;
+  migrationEstimate?: Receipt["migration"];
   feeMaximumStroops: string;
 }
 export interface SignedAttempt {
@@ -127,6 +146,14 @@ export type AttemptState =
   | "succeeded"
   | "failed";
 export interface Receipt {
+  migration?: {
+    destination: string;
+    destinationShares: string;
+    deposited: string[];
+    converted: string[];
+    refundAssets: string[];
+    refunds: string[];
+  };
   intentId: string;
   intentHash: string;
   profileHash: string;

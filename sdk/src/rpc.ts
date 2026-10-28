@@ -10,6 +10,7 @@ import {
   rpc,
   xdr,
 } from "@stellar/stellar-sdk";
+import { MierkhatError } from "./amount.js";
 import {
   assert,
   authDigest,
@@ -28,6 +29,9 @@ import {
   jsonSafe,
   profileHash,
   spec,
+  migrationSpec,
+  rootMethod,
+  decodeIntent,
 } from "./codec.js";
 import {
   type DeploymentBundle,
@@ -73,14 +77,31 @@ export async function readContract(
     .addOperation(new Contract(contract).call(method, ...args))
     .setTimeout(30)
     .build();
-  const sim = await server.simulateTransaction(tx);
-  assert(
-    rpc.Api.isSimulationSuccess(sim) &&
-      !rpc.Api.isSimulationRestore(sim) &&
-      sim.result,
-    "ReadUnavailable",
-    "service.unavailable",
-  );
+  let sim: Awaited<ReturnType<rpc.Server["simulateTransaction"]>>;
+  for (let attempt = 0; ; attempt++) {
+    try {
+      sim = await server.simulateTransaction(tx);
+      break;
+    } catch (e) {
+      if (attempt >= 1) throw e;
+    }
+  }
+  if (
+    !rpc.Api.isSimulationSuccess(sim) ||
+    rpc.Api.isSimulationRestore(sim) ||
+    !sim.result
+  ) {
+    const error = new MierkhatError(
+      "ReadUnavailable",
+      "service.unavailable",
+      true,
+    );
+    Object.assign(error, {
+      method,
+      cause: "error" in sim ? sim.error : "No readable simulation result",
+    });
+    throw error;
+  }
   return sim.result.retval;
 }
 export async function loadDeployment(
@@ -97,6 +118,14 @@ export async function loadDeployment(
     b.profile.router,
     b.profile.factory,
     ...b.profile.assets.flatMap((a) => (a.pair ? [a.pair] : [])),
+    ...(b.migration
+      ? [
+          b.migration.destination,
+          ...b.migration.destination_assets.flatMap((a) =>
+            a.pair ? [a.pair] : [],
+          ),
+        ]
+      : []),
   ];
   const contracts = [
     ...pins.map((p) => p.address),
@@ -208,8 +237,11 @@ export async function prepareExit(
   draft: ExitDraft,
   bundle: DeploymentBundle,
   server: rpc.Server,
+  deploymentAlreadyChecked = false,
 ): Promise<Review> {
-  const b = await loadDeployment(bundle, server, draft.intent.owner);
+  const b = deploymentAlreadyChecked
+    ? validateBundle(bundle)
+    : await loadDeployment(bundle, server, draft.intent.owner);
   const ledger = await latestLedger(server);
   validateIntent(draft, b, ledger);
   const account = await server.getAccount(draft.intent.owner);
@@ -220,7 +252,7 @@ export async function prepareExit(
     networkPassphrase: b.networkPassphrase,
   })
     .addOperation(
-      new Contract(b.guard).call("execute_exit", intentScVal(draft.intent)),
+      new Contract(b.guard).call(rootMethod(b), intentScVal(draft.intent)),
     )
     .setTimebounds(0, Number(maxTime))
     .setLedgerbounds(0, draft.intent.valid_before_ledger)
@@ -235,7 +267,7 @@ export async function prepareExit(
   );
   const assembled = rpc.assembleTransaction(tx, sim).build();
   verifyEnvelopePolicy(assembled, draft, b);
-  const estimate = decodeContractReceipt(sim.result.retval);
+  const estimate = decodeContractReceipt(sim.result.retval, !!b.migration);
   const review: Review = {
     reviewId: null,
     draft: structuredClone(draft),
@@ -248,6 +280,12 @@ export async function prepareExit(
     preparedLedger: ledger.sequence,
     preparedTime: ledger.timestamp,
     expectedReceiveRaw: estimate.received,
+    ...(estimate.migration
+      ? {
+          expectedDestinationSharesRaw: estimate.migration.destinationShares,
+          migrationEstimate: estimate.migration,
+        }
+      : {}),
     feeMaximumStroops: assembled.fee,
   };
   return verifyReview(
@@ -257,11 +295,16 @@ export async function prepareExit(
     await reviewLedger(server, draft.intent.owner),
   );
 }
-export function decodeContractReceipt(value: xdr.ScVal): Receipt {
-  const v = jsonSafe(spec.funcResToNative("execute_exit", value)) as Record<
-    string,
-    unknown
-  >;
+export function decodeContractReceipt(
+  value: xdr.ScVal,
+  migration = false,
+): Receipt {
+  const v = jsonSafe(
+    (migration ? migrationSpec : spec).funcResToNative(
+      migration ? "execute_migration" : "execute_exit",
+      value,
+    ),
+  ) as Record<string, unknown>;
   assert(
     v &&
       typeof v === "object" &&
@@ -270,6 +313,18 @@ export function decodeContractReceipt(value: xdr.ScVal): Receipt {
     "Receipt",
   );
   return {
+    ...(migration
+      ? {
+          migration: {
+            destination: String(v.destination),
+            destinationShares: String(v.destination_shares),
+            deposited: v.deposited as string[],
+            converted: v.converted as string[],
+            refundAssets: v.refund_assets as string[],
+            refunds: v.refunds as string[],
+          },
+        }
+      : {}),
     intentId: String(v.intent_id),
     intentHash: String(v.intent_hash),
     profileHash: String(v.profile_hash),
@@ -343,7 +398,7 @@ export async function decodeKnownReceipt(
   let receipt: Receipt | undefined;
   try {
     assert(result.returnValue, "MissingReceipt");
-    receipt = decodeContractReceipt(result.returnValue);
+    receipt = decodeContractReceipt(result.returnValue, !!b.migration);
     const op = tx.operations[0];
     assert(
       op?.type === "invokeHostFunction" &&
@@ -353,18 +408,11 @@ export async function decodeKnownReceipt(
     const call = op.func.invokeContract;
     assert(
       Address.fromScAddress(call.contractAddress).toString() === b.guard &&
-        call.functionName.toString() === "execute_exit" &&
+        call.functionName.toString() === rootMethod(b) &&
         call.args.length === 1,
       "ReceiptRoot",
     );
-    const i = jsonSafe(
-      spec.scValToNative(
-        call.args[0]!,
-        xdr.ScSpecTypeDef.scSpecTypeUdt(
-          new xdr.ScSpecTypeUdt({ name: "ExitIntent" }),
-        ),
-      ),
-    ) as ExitDraft["intent"];
+    const i = decodeIntent(call.args[0]!, b);
     const d: ExitDraft = {
       environment: b.environment,
       epoch: b.epoch,
@@ -379,7 +427,12 @@ export async function decodeKnownReceipt(
         receipt.owner === i.owner &&
         receipt.sharesSpent === i.shares &&
         BigInt(receipt.received) >= BigInt(i.min_receive) &&
-        receipt.ledger === result.ledger,
+        receipt.ledger === result.ledger &&
+        (!b.migration ||
+          (!!receipt.migration &&
+            receipt.migration.destination === b.migration.destination.address &&
+            BigInt(receipt.migration.destinationShares) >=
+              BigInt(i.migration!.min_destination_shares))),
       "ReceiptMismatch",
     );
   } catch {
@@ -510,7 +563,9 @@ export async function archivedObservation(
     const guarded =
       root?.type === "invokeHostFunction" &&
       root.func.type === "hostFunctionTypeInvokeContract" &&
-      root.func.invokeContract.functionName.toString() === "execute_exit" &&
+      ["execute_exit", "execute_migration"].includes(
+        root.func.invokeContract.functionName.toString(),
+      ) &&
       guards.includes(
         Address.fromScAddress(
           root.func.invokeContract.contractAddress,

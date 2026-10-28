@@ -328,5 +328,163 @@
     "shareDecimals": 7,
     "feeCeilingStroops": "10000000",
     "reviewed": true
+  },
+  {
+    "environment": "testnet",
+    "epoch": "migration-dual-to-mkout-v1",
+    "enabled": true,
+    "networkPassphrase": "Test SDF Network ; September 2015",
+    "guard": "CBLZCHRMTXFEJ7OWRE275SH6CJ3J4Q4QC7XEYSUJEUBKGG6WYFZLYF6X",
+    "guardWasmHash": "849e722114e5d48c3f4768590e3d6636045da8f5d3877aaafe71add36f834f6c",
+    "profileHash": "7fe9f0b82739efe6268fb57117d56e33d30bcda185e9348b5fd7a56aed4ddba1",
+    "profile": {
+      "schema": 1,
+      "network_id": "cee0302d59844d32bdca915c8203dd44b33fbb7edc19051ea37abedf28ecd472",
+      "vault": {
+        "address": "CA7BC5WFIE4TEE7UATJQDWMLMO242B5S3GCVZOGXHYEDABXLZNKXBBWX",
+        "wasm_hash": "e2786bd6693a117ec0d9c4acfab940d74a99687ea26e5273342adbd802a68dd9"
+      },
+      "router": {
+        "address": "CBATOXK3UEPQZXEWKDCPU2D26V27IEZYXASJJGE5ZOUAUHZH2DSDP7TW",
+        "wasm_hash": "394539a70060065116930cdbb5d301f299621025985ba9693c7e58142e642539"
+      },
+      "factory": {
+        "address": "CBNLZ7V5BG4UYZ645GXY7MGYYE3I676K7AMLVNQAZI5NIWOOXO36ILZZ",
+        "wasm_hash": "93ff0f4a634feceae6fb21b587b9508b58cbce8100da2eed0f53601ecf0533a6"
+      },
+      "settlement": "CDARIATHAO4DTSGHZDQQQRH7HUO6O2DOOVOCVYIIL4DXVFG3GXN6VTDR",
+      "assets": [
+        {
+          "asset": "CCECTMZ4PJIIHUVCUTGFVOBNJ5WA5JQSCTHJIQCXILMU2WKYWGFNJ45G",
+          "pair": {
+            "address": "CAAROB2VSLSORTRLQ7OSND5YXFYQWOI4ZYQ5VHOXHGFINZCOVHAT4FD4",
+            "wasm_hash": "aae8760f5eebdfefa66914cf98e4cf945f9bac4aa8e5613d4e9e2d423a438d8a"
+          }
+        },
+        {
+          "asset": "CBNVWZ5GBPOEISLJDBIVZS5MQASTX3ZK773CGXYBB2KN42GY2YS3JL5W",
+          "pair": {
+            "address": "CDFKGGP5SRNNNCEAZ4ECGWAQT4O3BU3IUY65VF6QU5MYN4Z5Q7KYELZH",
+            "wasm_hash": "aae8760f5eebdfefa66914cf98e4cf945f9bac4aa8e5613d4e9e2d423a438d8a"
+          }
+        }
+      ],
+      "max_seconds": 300,
+      "max_ledgers": 64
+    },
+    "tokens": [
+      {
+        "address": "CCECTMZ4PJIIHUVCUTGFVOBNJ5WA5JQSCTHJIQCXILMU2WKYWGFNJ45G",
+        "symbol": "MKA",
+        "decimals": 7
+      },
+      {
+        "address": "CBNVWZ5GBPOEISLJDBIVZS5MQASTX3ZK773CGXYBB2KN42GY2YS3JL5W",
+        "symbol": "MKB",
+        "decimals": 7
+      },
+      {
+        "address": "CDARIATHAO4DTSGHZDQQQRH7HUO6O2DOOVOCVYIIL4DXVFG3GXN6VTDR",
+        "symbol": "MKOUT",
+        "decimals": 7
+      }
+    ],
+    "vaultName": "Mierkhat testnet vault",
+    "shareDecimals": 7,
+    "migration": {
+      "destination": {
+        "address": "CCBNJ4BD3TT6A3ZTUXT2IRGZ2ONUQ3KVQLGOTLF4W5DLCKDU7LUPEJIG",
+        "wasm_hash": "e2786bd6693a117ec0d9c4acfab940d74a99687ea26e5273342adbd802a68dd9"
+      },
+      "destination_assets": [
+        {
+          "asset": "CDARIATHAO4DTSGHZDQQQRH7HUO6O2DOOVOCVYIIL4DXVFG3GXN6VTDR",
+          "pair": null
+        }
+      ],
+      "destinationName": "Mierkhat MKOUT vault",
+      "destinationShareDecimals": 7
+    },
+    "feeCeilingStroops": "10000000",
+    "reviewed": true
+  },
+  {
+    "environment": "testnet",
+    "epoch": "migration-mkout-to-dual-v1",
+    "enabled": true,
+    "networkPassphrase": "Test SDF Network ; September 2015",
+    "guard": "CBKAGU6YQB4DT3L45BYLC5YNPYZC4AZYZ3HSZ45COLFXYH3GYXJO5MS7",
+    "guardWasmHash": "849e722114e5d48c3f4768590e3d6636045da8f5d3877aaafe71add36f834f6c",
+    "profileHash": "f52134edd7c6a354e972ec39e8a4f86dc14b4919bf0db99be82adcfc4dc779ee",
+    "profile": {
+      "schema": 1,
+      "network_id": "cee0302d59844d32bdca915c8203dd44b33fbb7edc19051ea37abedf28ecd472",
+      "vault": {
+        "address": "CCBNJ4BD3TT6A3ZTUXT2IRGZ2ONUQ3KVQLGOTLF4W5DLCKDU7LUPEJIG",
+        "wasm_hash": "e2786bd6693a117ec0d9c4acfab940d74a99687ea26e5273342adbd802a68dd9"
+      },
+      "router": {
+        "address": "CBATOXK3UEPQZXEWKDCPU2D26V27IEZYXASJJGE5ZOUAUHZH2DSDP7TW",
+        "wasm_hash": "394539a70060065116930cdbb5d301f299621025985ba9693c7e58142e642539"
+      },
+      "factory": {
+        "address": "CBNLZ7V5BG4UYZ645GXY7MGYYE3I676K7AMLVNQAZI5NIWOOXO36ILZZ",
+        "wasm_hash": "93ff0f4a634feceae6fb21b587b9508b58cbce8100da2eed0f53601ecf0533a6"
+      },
+      "settlement": "CDARIATHAO4DTSGHZDQQQRH7HUO6O2DOOVOCVYIIL4DXVFG3GXN6VTDR",
+      "assets": [
+        {
+          "asset": "CDARIATHAO4DTSGHZDQQQRH7HUO6O2DOOVOCVYIIL4DXVFG3GXN6VTDR",
+          "pair": null
+        }
+      ],
+      "max_seconds": 300,
+      "max_ledgers": 64
+    },
+    "tokens": [
+      {
+        "address": "CCECTMZ4PJIIHUVCUTGFVOBNJ5WA5JQSCTHJIQCXILMU2WKYWGFNJ45G",
+        "symbol": "MKA",
+        "decimals": 7
+      },
+      {
+        "address": "CBNVWZ5GBPOEISLJDBIVZS5MQASTX3ZK773CGXYBB2KN42GY2YS3JL5W",
+        "symbol": "MKB",
+        "decimals": 7
+      },
+      {
+        "address": "CDARIATHAO4DTSGHZDQQQRH7HUO6O2DOOVOCVYIIL4DXVFG3GXN6VTDR",
+        "symbol": "MKOUT",
+        "decimals": 7
+      }
+    ],
+    "vaultName": "Mierkhat MKOUT vault",
+    "shareDecimals": 7,
+    "migration": {
+      "destination": {
+        "address": "CA7BC5WFIE4TEE7UATJQDWMLMO242B5S3GCVZOGXHYEDABXLZNKXBBWX",
+        "wasm_hash": "e2786bd6693a117ec0d9c4acfab940d74a99687ea26e5273342adbd802a68dd9"
+      },
+      "destination_assets": [
+        {
+          "asset": "CCECTMZ4PJIIHUVCUTGFVOBNJ5WA5JQSCTHJIQCXILMU2WKYWGFNJ45G",
+          "pair": {
+            "address": "CAAROB2VSLSORTRLQ7OSND5YXFYQWOI4ZYQ5VHOXHGFINZCOVHAT4FD4",
+            "wasm_hash": "aae8760f5eebdfefa66914cf98e4cf945f9bac4aa8e5613d4e9e2d423a438d8a"
+          }
+        },
+        {
+          "asset": "CBNVWZ5GBPOEISLJDBIVZS5MQASTX3ZK773CGXYBB2KN42GY2YS3JL5W",
+          "pair": {
+            "address": "CDFKGGP5SRNNNCEAZ4ECGWAQT4O3BU3IUY65VF6QU5MYN4Z5Q7KYELZH",
+            "wasm_hash": "aae8760f5eebdfefa66914cf98e4cf945f9bac4aa8e5613d4e9e2d423a438d8a"
+          }
+        }
+      ],
+      "destinationName": "Mierkhat testnet vault",
+      "destinationShareDecimals": 7
+    },
+    "feeCeilingStroops": "10000000",
+    "reviewed": true
   }
 ]
