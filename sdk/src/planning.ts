@@ -204,11 +204,19 @@ export async function planWithdrawal(
       last = e;
       if (
         !(e instanceof MierkhatError) ||
-        !["SimulationRejected", "StaleQuote"].includes(e.code)
+        ![
+          "SimulationRejected",
+          "StaleQuote",
+          "QuoteAmount",
+          "QuoteRoute",
+          "Zero",
+        ].includes(e.code)
       )
         throw e;
       if (candidate === max) break;
-      candidate = candidate + candidate / 100n + 1n;
+      candidate = ["QuoteAmount", "QuoteRoute", "Zero"].includes(e.code)
+        ? candidate * 2n
+        : candidate + candidate / 100n + 1n;
     }
   }
   throw last ?? new MierkhatError("TargetUnavailable", "plan.unavailable");
