@@ -118,6 +118,14 @@ it("serves real HTTP through the Vercel adapter with persistent database access 
       ).status,
     ).toBe(400);
     expect((await fetch(base + "/v1/missing")).status).toBe(404);
+    const unknownEpoch = await fetch(
+      base +
+        "/v1/accounts/" +
+        sdkFixture().draft.intent.owner +
+        "?epoch=unknown",
+    );
+    expect(unknownEpoch.status).toBe(422);
+    expect((await unknownEpoch.json()).code).toBe("UnsupportedDeployment");
   } finally {
     await new Promise<void>((resolve) => server.close(() => resolve()));
     await runtime.app.close();

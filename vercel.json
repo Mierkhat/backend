@@ -10,17 +10,20 @@
     }
   },
   "regions": ["iad1"],
-  "rewrites": [
-    {
-      "source": "/v1/:path*",
-      "destination": "/api/index"
-    }
-  ],
   "crons": [
     {
       "path": "/v1/internal/run",
       "schedule": "0 0 * * *"
     }
   ],
-  "outputDirectory": "public"
+  "outputDirectory": "public",
+  "routes": [
+    {
+      "handle": "filesystem"
+    },
+    {
+      "src": "/v1/.*",
+      "dest": "/api/index"
+    }
+  ]
 }
