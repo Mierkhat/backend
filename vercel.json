@@ -9,7 +9,20 @@
       "includeFiles": "{dist/**,sdk/deployments/**,migrations/**}"
     }
   },
-  "regions": ["iad1"],
-  "rewrites": [{ "source": "/v1/:path*", "destination": "/api/index" }],
-  "crons": [{ "path": "/v1/internal/run", "schedule": "0 0 * * *" }]
+  "regions": [
+    "iad1"
+  ],
+  "rewrites": [
+    {
+      "source": "/v1/:path*",
+      "destination": "/api/index"
+    }
+  ],
+  "crons": [
+    {
+      "path": "/v1/internal/run",
+      "schedule": "0 0 * * *"
+    }
+  ],
+  "outputDirectory": "public"
 }
