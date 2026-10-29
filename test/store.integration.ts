@@ -171,6 +171,22 @@ describe("R04/R06/R07 durable PostgreSQL tracking", () => {
       "EnvelopeConflict",
     );
   });
+  it("elects exactly one owner across concurrent lease contenders", async () => {
+    const { a } = attempt();
+    await store.record(a, "concurrent-lease-stress");
+    for (let round = 0; round < 30; round++) {
+      const workers = Array.from({ length: 8 }, () => randomUUID());
+      const claims = await Promise.all(
+        workers.map((worker) => store.claim(worker)),
+      );
+      expect(claims.filter(Boolean)).toHaveLength(1);
+      const lease = (await pool.query("SELECT worker_id FROM worker_leases"))
+        .rows;
+      expect(lease).toHaveLength(1);
+      expect(lease[0].worker_id).toBe(workers[claims.findIndex(Boolean)]);
+      await pool.query("DELETE FROM worker_leases");
+    }
+  });
   it("claims one lease, recovers expiry, and preserves terminal CAS", async () => {
     const { a } = attempt();
     await store.record(a, "attempt-key-000003");
