@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomBytes, randomUUID } from "node:crypto";
 import { createServer } from "node:net";
+import { createServer as httpServer } from "node:http";
 import EmbeddedPostgres from "embedded-postgres";
 import { Pool } from "pg";
 import { inspectSigned, bundleSchema, type SetupReview } from "@mierkhat/sdk";
@@ -67,6 +68,65 @@ function attempt() {
   f.tx.sign(f.key);
   return { f, a: inspectSigned(f.tx.toXDR(), f.bundle) };
 }
+it("serves real HTTP through the Vercel adapter with persistent database access and closed scheduler authorization", async () => {
+  const prior = {
+    VERCEL: process.env.VERCEL,
+    DATABASE_URL: process.env.DATABASE_URL,
+    PAYLOAD_KEY: process.env.PAYLOAD_KEY,
+    CRON_SECRET: process.env.CRON_SECRET,
+  };
+  process.env.VERCEL = "1";
+  process.env.DATABASE_URL = `postgresql://postgres:${encodeURIComponent(String(pool.options.password))}@127.0.0.1:${pool.options.port}/postgres`;
+  process.env.PAYLOAD_KEY = randomBytes(32).toString("hex");
+  delete process.env.CRON_SECRET;
+  const { default: handler } = await import(
+    new URL("../api/index.ts", import.meta.url).href
+  );
+  const runtime = await import(
+    new URL("../dist/server.js", import.meta.url).href
+  );
+  const server = httpServer((request, response) => {
+    void handler(request, response).catch(() => {
+      response.statusCode = 500;
+      response.end();
+    });
+  });
+  try {
+    await new Promise<void>((resolve) =>
+      server.listen(0, "127.0.0.1", resolve),
+    );
+    const address = server.address();
+    if (!address || typeof address === "string")
+      throw Error("Missing listener");
+    const base = `http://127.0.0.1:${address.port}`;
+    const health = await fetch(base + "/v1/health");
+    expect(health.status).toBe(200);
+    expect(await health.json()).toEqual({
+      status: "ready",
+      enabledDeployments: 8,
+    });
+    expect(health.headers.get("cache-control")).toBe("no-store");
+    expect(health.headers.get("x-content-type-options")).toBe("nosniff");
+    expect((await fetch(base + "/v1/internal/run")).status).toBe(401);
+    expect(
+      (
+        await fetch(base + "/v1/exit/quote", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: '{"owner":"invalid","shares":"25"}',
+        })
+      ).status,
+    ).toBe(400);
+    expect((await fetch(base + "/v1/missing")).status).toBe(404);
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    await runtime.app.close();
+    await runtime.pool.end();
+    for (const [key, value] of Object.entries(prior))
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+  }
+});
 describe("R04/R06/R07 durable PostgreSQL tracking", () => {
   it("encrypts exact bytes, survives a new Store, and deduplicates concurrent records", async () => {
     const { a } = attempt();

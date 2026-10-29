@@ -90,6 +90,7 @@ export async function createApp(options: {
   bundles: DeploymentBundle[];
   origins: string[];
   setup?: SetupService;
+  trustProxy?: boolean;
 }) {
   const { store, providers } = options;
   const knownBundles = options.bundles.map((b) => validateBundle(b, "read"));
@@ -100,7 +101,7 @@ export async function createApp(options: {
     bodyLimit: 262144,
     logger: false,
     requestTimeout: 15000,
-    trustProxy: false,
+    trustProxy: options.trustProxy ?? false,
   });
   await app.register(cors, {
     origin: options.origins,

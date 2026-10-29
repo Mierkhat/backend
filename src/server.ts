@@ -8,6 +8,8 @@ import { Keypair } from "@stellar/stellar-sdk";
 import { SetupService } from "./setup.js";
 import { WatchService } from "./watches.js";
 import { reconcileOne } from "./worker.js";
+import { createJobRunner, registerScheduledJobs } from "./jobs.js";
+const hosted = process.env.VERCEL === "1";
 const databaseUrl = process.env.DATABASE_URL;
 const payloadKey = process.env.PAYLOAD_KEY;
 if (!databaseUrl || !payloadKey || !/^[0-9a-f]{64}$/.test(payloadKey))
@@ -34,9 +36,9 @@ const endpoints: Record<string, string[]> = {
 const networks = Object.fromEntries(
   bundles.map((b) => [b.environment, b.networkPassphrase]),
 );
-const pool = new Pool({
+export const pool = new Pool({
   connectionString: databaseUrl,
-  max: 10,
+  max: hosted ? 3 : 10,
   connectionTimeoutMillis: 5000,
   statement_timeout: 10000,
 });
@@ -44,7 +46,9 @@ const store = new Store(pool, Buffer.from(payloadKey, "hex"));
 await store.migrate();
 const providers = new Providers(endpoints, networks);
 let issuer: Keypair | undefined;
-if (process.env.TESTNET_FAUCET_KEY_FILE) {
+if (process.env.TESTNET_FAUCET_SECRET) {
+  issuer = Keypair.fromSecret(process.env.TESTNET_FAUCET_SECRET);
+} else if (process.env.TESTNET_FAUCET_KEY_FILE) {
   const keys = JSON.parse(
     await readFile(process.env.TESTNET_FAUCET_KEY_FILE, "utf8"),
   );
@@ -66,41 +70,50 @@ const watches = new WatchService(
   providers,
   bundles.filter((b) => b.enabled),
 );
-const app = await createApp({
+export const app = await createApp({
   setup,
   store,
   providers,
   bundles,
   origins: (process.env.ALLOWED_ORIGINS ?? "http://localhost:5173").split(","),
+  trustProxy: hosted,
 });
 let stopping = false;
-let active: Promise<unknown> | undefined;
-const timer = setInterval(() => {
-  if (stopping || active || process.env.WORKERS_ENABLED === "0") return;
-  active = Promise.all([
-    reconcileOne(store, providers, bundles),
-    setup?.reconcile(),
-    watches.run(),
-  ])
-    .catch(() => {})
-    .finally(() => {
-      active = undefined;
-    });
-}, 1000);
-const prune = setInterval(() => {
-  void store.prune().catch(() => {});
-  void watches.prune().catch(() => {});
-}, 60000);
-await app.listen({
-  host: process.env.HOST ?? "127.0.0.1",
-  port: Number(process.env.PORT ?? 3001),
+export const jobs = createJobRunner(
+  [
+    () => reconcileOne(store, providers, bundles),
+    () => setup?.reconcile() ?? Promise.resolve(),
+    () => watches.run(),
+  ],
+  () => !stopping && process.env.WORKERS_ENABLED !== "0",
+);
+registerScheduledJobs(app, process.env.CRON_SECRET, async () => {
+  await jobs.runWindow();
+  await store.prune();
+  await watches.prune();
 });
+const timer = hosted
+  ? undefined
+  : setInterval(() => {
+      void jobs.runOnce().catch(() => {});
+    }, 1000);
+const prune = hosted
+  ? undefined
+  : setInterval(() => {
+      void store.prune().catch(() => {});
+      void watches.prune().catch(() => {});
+    }, 60000);
+if (!hosted)
+  await app.listen({
+    host: process.env.HOST ?? "127.0.0.1",
+    port: Number(process.env.PORT ?? 3001),
+  });
 for (const signal of ["SIGINT", "SIGTERM"])
   process.once(signal, async () => {
     stopping = true;
     clearInterval(timer);
     clearInterval(prune);
-    await active;
+    await jobs.settle();
     await app.close();
     await pool.end();
   });

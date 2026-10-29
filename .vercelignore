@@ -1,0 +1,16 @@
+.git
+.tooling
+.agents
+.env*
+!.env.example
+node_modules
+data
+coverage
+test
+sdk/fixtures
+sdk/src/**/*.test.ts
+sdk/src/test-fixture.ts
+src/**/*.test.ts
+TASKS.md
+AGENT.md
+AGENTS.md

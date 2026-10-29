@@ -17,6 +17,7 @@ jobs:
       - run: pnpm build
       - run: pnpm typecheck
       - run: pnpm typecheck:scripts
+      - run: pnpm typecheck:api
       - run: pnpm test
       - run: pnpm --filter @mierkhat/sdk typecheck
       - run: pnpm --filter @mierkhat/sdk typecheck:scripts

@@ -11,4 +11,5 @@ test-results/
 test_snapshots/
 *.log
 .DS_Store
+.vercel/
 data/

@@ -1,0 +1,15 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "installCommand": "pnpm install --frozen-lockfile",
+  "buildCommand": "pnpm build",
+  "functions": {
+    "api/index.ts": {
+      "maxDuration": 120,
+      "includeFiles": "{dist/**,sdk/deployments/**,migrations/**}"
+    }
+  },
+  "regions": ["iad1"],
+  "rewrites": [{ "source": "/v1/:path*", "destination": "/api/index" }],
+  "crons": [{ "path": "/v1/internal/run", "schedule": "0 0 * * *" }]
+}
