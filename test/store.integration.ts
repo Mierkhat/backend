@@ -80,7 +80,7 @@ it("serves real HTTP through the Vercel adapter with persistent database access 
   process.env.PAYLOAD_KEY = randomBytes(32).toString("hex");
   delete process.env.CRON_SECRET;
   const { default: handler } = await import(
-    new URL("../api/index.ts", import.meta.url).href
+    new URL("../api/index.js", import.meta.url).href
   );
   const runtime = await import(
     new URL("../dist/server.js", import.meta.url).href

@@ -33,7 +33,7 @@ Install the frozen lockfile and run `pnpm build`. Put TLS in front and expose `/
 
 ## Vercel
 
-`vercel.json` deploys the Node adapter in `api/index.ts`; `/v1` requests reach the same Fastify routes and retain the 256 KiB body limit. Vercel provides TLS and trusted forwarding headers. The adapter uses a three-connection PostgreSQL pool attached to the function lifecycle. Configure a separate production database, the existing registry, `PAYLOAD_KEY`, `ALLOWED_ORIGINS=https://mierkhat.vercel.app` and the optional dedicated issuer secret in backend environment variables only. Use a direct PostgreSQL URL for session advisory locks during migrations. Build before running `pnpm typecheck:api`.
+`vercel.json` deploys the Node adapter in `api/index.js`; `/v1` requests reach the same Fastify routes and retain the 256 KiB body limit. Vercel provides TLS and trusted forwarding headers. The adapter uses a three-connection PostgreSQL pool attached to the function lifecycle. Configure a separate production database, the existing registry, `PAYLOAD_KEY`, `ALLOWED_ORIGINS=https://mierkhat.vercel.app` and the optional dedicated issuer secret in backend environment variables only. Use a direct PostgreSQL URL for session advisory locks during migrations. Build before running `pnpm typecheck:api`.
 
 Vercel mode starts no permanent timer or listener. Submissions, transaction lookups and watch requests schedule a shared background window of four leased cycles, fifteen seconds apart. The existing database claims and compare-and-set updates still control exact retries. The authenticated `/v1/internal/run` GET/POST route runs the same bounded work and retention pruning. It rejects every request unless its bearer token matches `CRON_SECRET`.
 

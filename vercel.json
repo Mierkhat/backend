@@ -4,14 +4,12 @@
   "installCommand": "pnpm install --frozen-lockfile",
   "buildCommand": "pnpm build",
   "functions": {
-    "api/index.ts": {
+    "api/index.js": {
       "maxDuration": 120,
       "includeFiles": "{dist/**,sdk/deployments/**,migrations/**}"
     }
   },
-  "regions": [
-    "iad1"
-  ],
+  "regions": ["iad1"],
   "rewrites": [
     {
       "source": "/v1/:path*",

@@ -1,16 +1,16 @@
-import type { IncomingMessage, ServerResponse } from "node:http";
 import { attachDatabasePool, waitUntil } from "@vercel/functions";
 import { app, jobs, pool } from "../dist/server.js";
 
 attachDatabasePool(pool);
-export default async function handler(
-  request: IncomingMessage,
-  response: ServerResponse,
-) {
+/**
+ * @param {import("node:http").IncomingMessage} request
+ * @param {import("node:http").ServerResponse} response
+ */
+export default async function handler(request, response) {
   await app.ready();
-  const finished = new Promise<void>((resolve) => {
-    response.once("finish", resolve);
-    response.once("close", resolve);
+  const finished = new Promise((resolve) => {
+    response.once("finish", () => resolve(undefined));
+    response.once("close", () => resolve(undefined));
   });
   app.server.emit("request", request, response);
   await finished;
