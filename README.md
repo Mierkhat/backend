@@ -99,6 +99,8 @@ compose.yaml  Pinned local PostgreSQL service
 
 The SDK is a local workspace package; no npm release is needed. Ordinary owner-signed accounts are supported. Mainnet, fee bumps, separate fee sources and nonstandard signers are rejected. `reviewed` denotes source/integration verification, not an independent audit.
 
+Enabled testnet routes have a fixed 5 XLM preparation ceiling. Current measured Soroban resource fees exceed the previous 1 XLM ceiling; all eight full-flow preflights are recorded in `sdk/fixtures/testnet-fee-preflight.json`. The prepared envelope includes its exact simulated resource fee plus inclusion fee, which the frontend shows before wallet approval. The 5 XLM ceiling is a rejection limit, not the amount inserted into every transaction. Fees above it and wallet mutations remain rejected.
+
 ## Combined workspace
 
 In the original combined workspace, run `./scripts/pnpm --filter @mierkhat/backend <command>` from its root. The local launcher retains that workspace's root `.tooling/local/` storage. Standalone clones use this repository's `.tooling/local/`.

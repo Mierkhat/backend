@@ -1,0 +1,163 @@
+{
+  "network": "testnet",
+  "checkedAt": "2026-10-29T12:02:08.315Z",
+  "unsignedOnly": true,
+  "results": [
+    {
+      "epoch": "positions-dual-mka-v1",
+      "owner": "GCAVTARGBNDGUCVBMXE2RU5OW5TBJZANS3UDPTMGDAECA3XYHGY77T5C",
+      "sharesRaw": "250000000",
+      "holdingSharesRaw": "17999999000",
+      "previousFeeCeilingStroops": "10000000",
+      "simulations": [
+        {
+          "method": "execute_exit",
+          "inclusionFeeStroops": "100",
+          "minResourceFeeStroops": "22470630"
+        }
+      ],
+      "submissions": 0,
+      "preparedLedger": 5450331,
+      "preparedAt": "1793275295",
+      "requiredFeeStroops": "22470730"
+    },
+    {
+      "epoch": "integration-fixture-v1",
+      "owner": "GCAVTARGBNDGUCVBMXE2RU5OW5TBJZANS3UDPTMGDAECA3XYHGY77T5C",
+      "sharesRaw": "250000000",
+      "holdingSharesRaw": "17999999000",
+      "previousFeeCeilingStroops": "10000000",
+      "simulations": [
+        {
+          "method": "execute_exit",
+          "inclusionFeeStroops": "100",
+          "minResourceFeeStroops": "22542267"
+        }
+      ],
+      "submissions": 0,
+      "preparedLedger": 5450331,
+      "preparedAt": "1793275295",
+      "requiredFeeStroops": "22542367"
+    },
+    {
+      "epoch": "positions-dual-mkb-v1",
+      "owner": "GCAVTARGBNDGUCVBMXE2RU5OW5TBJZANS3UDPTMGDAECA3XYHGY77T5C",
+      "sharesRaw": "250000000",
+      "holdingSharesRaw": "17999999000",
+      "previousFeeCeilingStroops": "10000000",
+      "simulations": [
+        {
+          "method": "execute_exit",
+          "inclusionFeeStroops": "100",
+          "minResourceFeeStroops": "22472018"
+        }
+      ],
+      "submissions": 0,
+      "preparedLedger": 5450333,
+      "preparedAt": "1793275305",
+      "requiredFeeStroops": "22472118"
+    },
+    {
+      "epoch": "positions-mkout-mka-v1",
+      "owner": "GCAVTARGBNDGUCVBMXE2RU5OW5TBJZANS3UDPTMGDAECA3XYHGY77T5C",
+      "sharesRaw": "40098215",
+      "holdingSharesRaw": "80196430",
+      "previousFeeCeilingStroops": "10000000",
+      "simulations": [
+        {
+          "method": "execute_exit",
+          "inclusionFeeStroops": "100",
+          "minResourceFeeStroops": "22451618"
+        }
+      ],
+      "submissions": 0,
+      "preparedLedger": 5450333,
+      "preparedAt": "1793275305",
+      "requiredFeeStroops": "22451718"
+    },
+    {
+      "epoch": "positions-mkout-mkout-v1",
+      "owner": "GCAVTARGBNDGUCVBMXE2RU5OW5TBJZANS3UDPTMGDAECA3XYHGY77T5C",
+      "sharesRaw": "40098215",
+      "holdingSharesRaw": "80196430",
+      "previousFeeCeilingStroops": "10000000",
+      "simulations": [
+        {
+          "method": "execute_exit",
+          "inclusionFeeStroops": "100",
+          "minResourceFeeStroops": "17242269"
+        }
+      ],
+      "submissions": 0,
+      "preparedLedger": 5450334,
+      "preparedAt": "1793275310",
+      "requiredFeeStroops": "17242369"
+    },
+    {
+      "epoch": "positions-mkout-mkb-v1",
+      "owner": "GCAVTARGBNDGUCVBMXE2RU5OW5TBJZANS3UDPTMGDAECA3XYHGY77T5C",
+      "sharesRaw": "40098215",
+      "holdingSharesRaw": "80196430",
+      "previousFeeCeilingStroops": "10000000",
+      "simulations": [
+        {
+          "method": "execute_exit",
+          "inclusionFeeStroops": "100",
+          "minResourceFeeStroops": "22453004"
+        }
+      ],
+      "submissions": 0,
+      "preparedLedger": 5450334,
+      "preparedAt": "1793275310",
+      "requiredFeeStroops": "22453104"
+    },
+    {
+      "epoch": "migration-mkout-to-dual-v1",
+      "owner": "GCAVTARGBNDGUCVBMXE2RU5OW5TBJZANS3UDPTMGDAECA3XYHGY77T5C",
+      "sharesRaw": "40098215",
+      "holdingSharesRaw": "80196430",
+      "previousFeeCeilingStroops": "10000000",
+      "simulations": [
+        {
+          "method": "execute_migration",
+          "inclusionFeeStroops": "100",
+          "minResourceFeeStroops": "22580056"
+        },
+        {
+          "method": "execute_migration",
+          "inclusionFeeStroops": "100",
+          "minResourceFeeStroops": "22580752"
+        }
+      ],
+      "submissions": 0,
+      "preparedLedger": 5450337,
+      "preparedAt": "1793275325",
+      "requiredFeeStroops": "22580852"
+    },
+    {
+      "epoch": "migration-dual-to-mkout-v1",
+      "owner": "GCAVTARGBNDGUCVBMXE2RU5OW5TBJZANS3UDPTMGDAECA3XYHGY77T5C",
+      "sharesRaw": "250000000",
+      "holdingSharesRaw": "17999999000",
+      "previousFeeCeilingStroops": "10000000",
+      "simulations": [
+        {
+          "method": "execute_migration",
+          "inclusionFeeStroops": "100",
+          "minResourceFeeStroops": "22575624"
+        },
+        {
+          "method": "execute_migration",
+          "inclusionFeeStroops": "100",
+          "minResourceFeeStroops": "22576320"
+        }
+      ],
+      "submissions": 0,
+      "preparedLedger": 5450337,
+      "preparedAt": "1793275325",
+      "requiredFeeStroops": "22576420"
+    }
+  ],
+  "configuredFeeCeilingStroops": "50000000",
+  "reason": "Current simulated Soroban resource fees exceed the previous 1 XLM testnet cap. The fixed 5 XLM cap retains more than 100 percent headroom on all eight measured routes. Each signed envelope retains its exact simulated fee, which is shown for explicit review."
+}

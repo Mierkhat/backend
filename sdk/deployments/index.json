@@ -61,7 +61,7 @@
     ],
     "vaultName": "Mierkhat testnet vault",
     "shareDecimals": 7,
-    "feeCeilingStroops": "10000000",
+    "feeCeilingStroops": "50000000",
     "reviewed": true
   },
   {
@@ -118,7 +118,7 @@
     ],
     "vaultName": "Mierkhat testnet vault",
     "shareDecimals": 7,
-    "feeCeilingStroops": "10000000",
+    "feeCeilingStroops": "50000000",
     "reviewed": true
   },
   {
@@ -175,7 +175,7 @@
     ],
     "vaultName": "Mierkhat testnet vault",
     "shareDecimals": 7,
-    "feeCeilingStroops": "10000000",
+    "feeCeilingStroops": "50000000",
     "reviewed": true
   },
   {
@@ -228,7 +228,7 @@
     ],
     "vaultName": "Mierkhat MKOUT vault",
     "shareDecimals": 7,
-    "feeCeilingStroops": "10000000",
+    "feeCeilingStroops": "50000000",
     "reviewed": true
   },
   {
@@ -281,7 +281,7 @@
     ],
     "vaultName": "Mierkhat MKOUT vault",
     "shareDecimals": 7,
-    "feeCeilingStroops": "10000000",
+    "feeCeilingStroops": "50000000",
     "reviewed": true
   },
   {
@@ -326,7 +326,7 @@
     ],
     "vaultName": "Mierkhat MKOUT vault",
     "shareDecimals": 7,
-    "feeCeilingStroops": "10000000",
+    "feeCeilingStroops": "50000000",
     "reviewed": true
   },
   {
@@ -405,7 +405,7 @@
       "destinationName": "Mierkhat MKOUT vault",
       "destinationShareDecimals": 7
     },
-    "feeCeilingStroops": "10000000",
+    "feeCeilingStroops": "50000000",
     "reviewed": true
   },
   {
@@ -484,7 +484,7 @@
       "destinationName": "Mierkhat testnet vault",
       "destinationShareDecimals": 7
     },
-    "feeCeilingStroops": "10000000",
+    "feeCeilingStroops": "50000000",
     "reviewed": true
   }
 ]

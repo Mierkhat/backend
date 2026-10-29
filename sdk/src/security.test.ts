@@ -44,6 +44,30 @@ describe("R16 amounts", () => {
   });
 });
 describe("R03/R15 envelope policy", () => {
+  it("enforces the configured total fee ceiling including Soroban resource fees", () => {
+    const f = sdkFixture();
+    const body = txV1(f.tx);
+    for (const fee of [
+      Number(f.bundle.feeCeilingStroops),
+      Number(f.bundle.feeCeilingStroops) + 1,
+    ]) {
+      const tx = new Transaction(
+        xdr.TransactionEnvelope.envelopeTypeTx(
+          new xdr.TransactionV1Envelope({
+            tx: new xdr.Transaction({ ...body, fee }),
+            signatures: [],
+          }),
+        ),
+        f.bundle.networkPassphrase,
+      );
+      if (fee === Number(f.bundle.feeCeilingStroops))
+        expect(() => verifyEnvelopePolicy(tx, f.draft, f.bundle)).not.toThrow();
+      else
+        expect(() => verifyEnvelopePolicy(tx, f.draft, f.bundle)).toThrow(
+          "FeeCeiling",
+        );
+    }
+  });
   it("verifies source root auth and exact signature bytes", () => {
     const f = sdkFixture();
     expect(verifyReview(f.review, f.draft, f.bundle, f.ledger)).toEqual(
