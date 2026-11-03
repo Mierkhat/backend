@@ -1,0 +1,6 @@
+# Reviewed historical false positives: public contract addresses, auth digests and ledger-key XDR.
+# Exact commit/file/rule/line fingerprints only; new findings remain blocked.
+de8b3e7ff4e3614c1f799794f4c54c05df3bb369:sdk/fixtures/testnet-setup.json:generic-api-key:16
+de8b3e7ff4e3614c1f799794f4c54c05df3bb369:sdk/fixtures/testnet-setup.json:generic-api-key:45
+3da555b79dc6dce40456f7f0b76f20de5bf691c4:sdk/fixtures/testnet-restore.json:generic-api-key:11
+dd5c4e6d5ce593ab490db2aede50ea23de3ae64f:sdk/fixtures/testnet-auth.json:generic-api-key:90

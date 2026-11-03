@@ -1,0 +1,17 @@
+# CI, deployment and dependency changes require the project owner.
+/.github/ @dotmantissa
+/scripts/ @dotmantissa
+/vercel.json @dotmantissa
+/pnpm-lock.yaml @dotmantissa
+/pnpm-workspace.yaml @dotmantissa
+/.vendor/ @dotmantissa
+/sdk/deployments/ @dotmantissa
+/src/deployments.json @dotmantissa
+/Cargo.lock @dotmantissa
+/rust-toolchain.toml @dotmantissa
+/evidence/ @dotmantissa
+/.gitleaksignore @dotmantissa
+/migrations/ @dotmantissa
+/guard/ @dotmantissa
+/migration/ @dotmantissa
+/sdk/src/generated/ @dotmantissa
