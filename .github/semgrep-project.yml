@@ -1,0 +1,14 @@
+rules:
+  - id: mierkhat-sql-request-injection
+    languages: [typescript, javascript]
+    message: Request data must be passed as bound PostgreSQL values, never as SQL text.
+    severity: ERROR
+    mode: taint
+    pattern-sources:
+      - pattern: $REQ.body
+      - pattern: $REQ.params
+      - pattern: $REQ.query
+    pattern-sinks:
+      - patterns:
+          - pattern: $DB.query($SQL, ...)
+          - focus-metavariable: $SQL

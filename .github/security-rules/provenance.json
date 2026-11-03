@@ -1,0 +1,166 @@
+{
+  "repository": "https://github.com/semgrep/semgrep-rules",
+  "commit": "16b9e6d45f10649f6a531ec4838ed9924372c3bc",
+  "files": {
+    "javascript__aws-lambda__security__pg-sqli.yaml": {
+      "source": "javascript/aws-lambda/security/pg-sqli.yaml",
+      "sha256": "267e1dea6127d5f6b311a048c8a9de8c7a88e756a90a31c5c2bd737715c919e8"
+    },
+    "javascript__browser__security__dom-based-xss.yaml": {
+      "source": "javascript/browser/security/dom-based-xss.yaml",
+      "sha256": "d34055a348ee0d5e6f5587825bd14c9546997550e624e3966e5ef8438f86381d"
+    },
+    "javascript__browser__security__eval-detected.yaml": {
+      "source": "javascript/browser/security/eval-detected.yaml",
+      "sha256": "356589363d16cda8bd2ca1d296ce2b6953105ee4c751ddbbc9bcde5849341811"
+    },
+    "javascript__browser__security__insecure-document-method.yaml": {
+      "source": "javascript/browser/security/insecure-document-method.yaml",
+      "sha256": "c2071baab4896cb66b3337ef2d901c9c772a6cbcfd4b2c942efb74ee0be3b7f3"
+    },
+    "javascript__browser__security__insecure-innerhtml.yaml": {
+      "source": "javascript/browser/security/insecure-innerhtml.yaml",
+      "sha256": "3f2854f92c3c8a1ba3a107a140a5b31789650851be57586fd21a409e129193e4"
+    },
+    "javascript__browser__security__insufficient-postmessage-origin-validation.yaml": {
+      "source": "javascript/browser/security/insufficient-postmessage-origin-validation.yaml",
+      "sha256": "72e69717624b282e678e03aeab8416c883a9d0c286f0496af406a80fd4dcc2bf"
+    },
+    "javascript__browser__security__open-redirect-from-function.yaml": {
+      "source": "javascript/browser/security/open-redirect-from-function.yaml",
+      "sha256": "6afe3ff95252261c3f3502bda97921193e821a6931119f945fa30aae3c122b8d"
+    },
+    "javascript__browser__security__open-redirect.yaml": {
+      "source": "javascript/browser/security/open-redirect.yaml",
+      "sha256": "896332cf7d17f4ccea855006baebfddd83ccf90e07315958bb62bbc2916950f4"
+    },
+    "javascript__browser__security__raw-html-concat.yaml": {
+      "source": "javascript/browser/security/raw-html-concat.yaml",
+      "sha256": "39c8c842711e452c1b4b0b03bc526652d69c887b6ac790215604ec4cde80a403"
+    },
+    "javascript__browser__security__raw-html-join.yaml": {
+      "source": "javascript/browser/security/raw-html-join.yaml",
+      "sha256": "276ca2addaf9507ef1a792411ff8bc71f55f7c93ddbedee902b1a627c1fa271b"
+    },
+    "javascript__browser__security__wildcard-postmessage-configuration.yaml": {
+      "source": "javascript/browser/security/wildcard-postmessage-configuration.yaml",
+      "sha256": "4bb9d0a44a38c433ebe1b3df30895576a056262c3e12da57cee9c6be9fc0d813"
+    },
+    "javascript__lang__security__detect-buffer-noassert.yaml": {
+      "source": "javascript/lang/security/detect-buffer-noassert.yaml",
+      "sha256": "e6566d2c7138b038e1c3167f3e9ff98550cf81a2d70caa94a5362a55294077f6"
+    },
+    "javascript__lang__security__detect-child-process.yaml": {
+      "source": "javascript/lang/security/detect-child-process.yaml",
+      "sha256": "baee696b05b3c38fa5a82435ae458026ec81ce9a6e6a73116d68dc963496296c"
+    },
+    "javascript__lang__security__detect-disable-mustache-escape.yaml": {
+      "source": "javascript/lang/security/detect-disable-mustache-escape.yaml",
+      "sha256": "8d6d81249121230be2d11fd7a2cce2ce23837520f8e0fc1df45868ec159edb09"
+    },
+    "javascript__lang__security__detect-eval-with-expression.yaml": {
+      "source": "javascript/lang/security/detect-eval-with-expression.yaml",
+      "sha256": "3b8fe2524b094c72c34aaa6d21b0408ffdac2471a335125cf726993253777951"
+    },
+    "javascript__lang__security__detect-insecure-websocket.yaml": {
+      "source": "javascript/lang/security/detect-insecure-websocket.yaml",
+      "sha256": "65935c49d62e264a6b85a496455989137d7e82d4698855d511d173ed08ad3099"
+    },
+    "javascript__lang__security__detect-no-csrf-before-method-override.yaml": {
+      "source": "javascript/lang/security/detect-no-csrf-before-method-override.yaml",
+      "sha256": "d361537a89c773a4940f107a2e787c6309d121e965a88f471b55d0db15ccb859"
+    },
+    "javascript__lang__security__detect-pseudoRandomBytes.yaml": {
+      "source": "javascript/lang/security/detect-pseudoRandomBytes.yaml",
+      "sha256": "d3c2b2168e6b1efdfc305a783387634e3ead8e0db6d4bdd3417381e177da4058"
+    },
+    "javascript__lang__security__html-in-template-string.yaml": {
+      "source": "javascript/lang/security/html-in-template-string.yaml",
+      "sha256": "1c32479fb6228a0a3a3618e6308b5bdfec14f05f7cf12a2321519b4095cf117d"
+    },
+    "javascript__lang__security__insecure-object-assign.yaml": {
+      "source": "javascript/lang/security/insecure-object-assign.yaml",
+      "sha256": "bc5a5fdef1a8a4889f1d3efebdd3cb1f1e58f5261418928ae6c765eb7f1b2397"
+    },
+    "javascript__lang__security__spawn-git-clone.yaml": {
+      "source": "javascript/lang/security/spawn-git-clone.yaml",
+      "sha256": "d87fdf812e1a61f137bde701d75415525ea66c45c593374a6f9ec2081609539f"
+    },
+    "rust__lang__security__args-os.yml": {
+      "source": "rust/lang/security/args-os.yml",
+      "sha256": "24a9fb8d86f4a749a921f7a9b687fcdbef168d4a18e52c5471bcf5db232bfdf5"
+    },
+    "rust__lang__security__args.yml": {
+      "source": "rust/lang/security/args.yml",
+      "sha256": "c84ef972cc47e8739ca4052d65136a44715561190a5dfcd67a0c7498c816cb6e"
+    },
+    "rust__lang__security__current-exe.yml": {
+      "source": "rust/lang/security/current-exe.yml",
+      "sha256": "3eac3039fadf1817f0dac73df173cbe579ac8edf20312ff10db24cf8f5aaa9e0"
+    },
+    "rust__lang__security__insecure-hashes.yml": {
+      "source": "rust/lang/security/insecure-hashes.yml",
+      "sha256": "5d77d4459a9d29e4b1b2303f2bdbc5282c7e30eda287e288428792659296dd24"
+    },
+    "rust__lang__security__reqwest-accept-invalid.yml": {
+      "source": "rust/lang/security/reqwest-accept-invalid.yml",
+      "sha256": "dfd5bb583ee0d69342d684b9472b01dd4f39a951df645b4278b44827740a3c6a"
+    },
+    "rust__lang__security__reqwest-set-sensitive.yml": {
+      "source": "rust/lang/security/reqwest-set-sensitive.yml",
+      "sha256": "9b967da495a349b99644b1c3b8665b52803c8837e691afc89f73a11798739bb9"
+    },
+    "rust__lang__security__rustls-dangerous.yml": {
+      "source": "rust/lang/security/rustls-dangerous.yml",
+      "sha256": "dc3187a08d4cbf9200b043c30cd46ad5cd2ce8782d43b372773dd37c4362b8f8"
+    },
+    "rust__lang__security__ssl-verify-none.yml": {
+      "source": "rust/lang/security/ssl-verify-none.yml",
+      "sha256": "2933371073e51986b8c6a45d1761926c3411f66ee37a2ddf36fd090f2eeb61c8"
+    },
+    "rust__lang__security__temp-dir.yml": {
+      "source": "rust/lang/security/temp-dir.yml",
+      "sha256": "a06af8b8e02a1ff20bb62d56d80ad43e6c71390f1f589226db3d14a6731bed10"
+    },
+    "rust__lang__security__unsafe-usage.yml": {
+      "source": "rust/lang/security/unsafe-usage.yml",
+      "sha256": "9a0841f3fcdefa8f9b904add92e011eb3709b4a9df791ec00ed138b068cee37d"
+    },
+    "typescript__react__security__audit__react-dangerouslysetinnerhtml.yaml": {
+      "source": "typescript/react/security/audit/react-dangerouslysetinnerhtml.yaml",
+      "sha256": "794094512be7f7dcaa49a4b1edf621dbdf1f984b4f29ab09a23538c0e59c2136"
+    },
+    "typescript__react__security__audit__react-href-var.yaml": {
+      "source": "typescript/react/security/audit/react-href-var.yaml",
+      "sha256": "aa8ade23b4a351f93be2bcd47ecc694b6b3d2a861a65fc8d345a6cb87f9253f2"
+    },
+    "typescript__react__security__audit__react-jwt-decoded-property.yaml": {
+      "source": "typescript/react/security/audit/react-jwt-decoded-property.yaml",
+      "sha256": "5e4ca6b6fa672c29cfbf78993f8b3b5724d77fd99da251de7b108835705fec15"
+    },
+    "typescript__react__security__audit__react-jwt-in-localstorage.yaml": {
+      "source": "typescript/react/security/audit/react-jwt-in-localstorage.yaml",
+      "sha256": "8850734261ecbb6eee29707a683acc5d177b2d785cec00ef4788eb6193b5ba05"
+    },
+    "typescript__react__security__audit__react-unsanitized-method.yaml": {
+      "source": "typescript/react/security/audit/react-unsanitized-method.yaml",
+      "sha256": "c774bae09d1b0d8c4c12c32436f4dad6d93a590f9cfbd159bc2ab2416054d273"
+    },
+    "typescript__react__security__audit__react-unsanitized-property.yaml": {
+      "source": "typescript/react/security/audit/react-unsanitized-property.yaml",
+      "sha256": "0dc00b10abae599731f0c4f56c9efc64cf2469dfa4cc0d562ca6a3a0581be59d"
+    },
+    "typescript__react__security__react-insecure-request.yaml": {
+      "source": "typescript/react/security/react-insecure-request.yaml",
+      "sha256": "4869905cc60559b8ca0ed0ac62c5abe9a26b2ee0e3bbdc0d1baf47271ee70376"
+    },
+    "typescript__react__security__react-markdown-insecure-html.yaml": {
+      "source": "typescript/react/security/react-markdown-insecure-html.yaml",
+      "sha256": "e464c0f72c8a89ae325524b738c7c2024be1258e7a060a6365b487a0aa284434"
+    },
+    "LICENSE": {
+      "source": "LICENSE",
+      "sha256": "1a6466ae5f1c68631bbd13e3f1aa8f380d84219853c08f0456b853fccfacee1d"
+    }
+  }
+}
