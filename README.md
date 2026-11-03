@@ -112,3 +112,5 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request. Report se
 ## License
 
 Mierkhat-authored code uses the [MIT license](LICENSE). Dependencies, upstream protocols, fonts where bundled and brand usage retain the terms described in [third-party notices](THIRD_PARTY_NOTICES.md).
+
+[CI/CD operations](docs/CI_CD.md) describes required checks, coordinated SDK/contract updates, automatic production releases and rollback.
