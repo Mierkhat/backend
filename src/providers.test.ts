@@ -2,6 +2,27 @@ import { afterEach, it, expect, vi } from "vitest";
 import { rpc, MierkhatError } from "@mierkhat/sdk";
 import { Providers } from "./providers.js";
 afterEach(() => vi.restoreAllMocks());
+
+it("fails over retryable SDK read errors but preserves deterministic policy rejection", async () => {
+  vi.spyOn(rpc.Server.prototype, "getNetwork").mockResolvedValue({
+    passphrase: "expected", protocolVersion: "29",
+  });
+  vi.spyOn(rpc.Server.prototype, "getLatestLedger").mockResolvedValue({
+    sequence: 100, closeTime: String(Math.floor(Date.now() / 1000)),
+  } as Awaited<ReturnType<rpc.Server["getLatestLedger"]>>);
+  const providers = new Providers(
+    { testnet: ["https://first.example", "https://second.example"] },
+    { testnet: "expected" },
+  );
+  const work = vi.fn()
+    .mockRejectedValueOnce(new MierkhatError("ReadUnavailable", "service.unavailable", true))
+    .mockResolvedValue("fresh read");
+  expect(await providers.run("testnet", work)).toBe("fresh read");
+  expect(work).toHaveBeenCalledTimes(2);
+  const reject = vi.fn().mockRejectedValue(new MierkhatError("CodeChanged", "route.changed"));
+  await expect(providers.run("testnet", reject)).rejects.toThrow("CodeChanged");
+  expect(reject).toHaveBeenCalledTimes(1);
+});
 it("rejects environments without configured providers without invoking caller work", async () => {
   let invoked = false;
   await expect(

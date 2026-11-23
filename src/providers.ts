@@ -41,7 +41,7 @@ export class Providers {
         this.failures.delete(url);
         return result;
       } catch (error) {
-        if (error instanceof MierkhatError) {
+        if (error instanceof MierkhatError && !error.retryable) {
           this.failures.delete(url);
           throw error;
         }

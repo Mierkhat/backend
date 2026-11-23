@@ -68,6 +68,24 @@ function attempt() {
   f.tx.sign(f.key);
   return { f, a: inspectSigned(f.tx.toXDR(), f.bundle) };
 }
+
+it("isolates recorded setup transactions from another requested network", async () => {
+  const bundle = bundleSchema.parse(registry[0]);
+  const setup = new SetupService(store, new Providers({}, {}), bundle);
+  const fixture = actualSetup[0]!;
+  const hash = await setup.record(fixture.signedXdr, fixture.review as SetupReview);
+  const observation = { hash, state: "succeeded", observedAt: new Date().toISOString() };
+  await pool.query("UPDATE setup_jobs SET state='succeeded',observation=$1 WHERE tx_hash=$2", [observation, hash]);
+  const app = await createApp({ store, setup, providers: new Providers({}, {}), bundles: [bundle], origins: [] });
+  try {
+    const testnet = await app.inject(`/v1/transactions/${hash}?environment=testnet`);
+    expect(testnet.statusCode).toBe(200);
+    expect(testnet.json()).toEqual(observation);
+    const mainnet = await app.inject(`/v1/transactions/${hash}?environment=mainnet`);
+    expect(mainnet.statusCode).toBe(422);
+    expect(mainnet.json().code).toBe("UnsupportedDeployment");
+  } finally { await app.close(); }
+});
 it("serves real HTTP through the Vercel adapter with persistent database access and closed scheduler authorization", async () => {
   const prior = {
     VERCEL: process.env.VERCEL,

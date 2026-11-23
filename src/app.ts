@@ -132,7 +132,7 @@ export async function createApp(options: {
         : error instanceof z.ZodError
           ? 400
           : error instanceof MierkhatError
-            ? 422
+            ? error.retryable ? 503 : 422
             : (clientStatus ?? 503);
     reply.code(status).send({
       code:
@@ -150,7 +150,7 @@ export async function createApp(options: {
           ? error.copyKey
           : status >= 400 && status < 500 && status !== 429
             ? "input.invalid"
-            : "service.unavailable",
+            : status === 429 ? "service.rate_limited" : "service.unavailable",
       retryable: status >= 500 || status === 429,
       requestId: req.id,
     });
@@ -592,11 +592,11 @@ export async function createApp(options: {
   app.get("/v1/transactions/:hash", async (req, reply) => {
     const q = query.parse(req.query);
     const p = z.object({ hash: hashSchema }).parse(req.params);
-    const setupRow = await store.pool.query(
+    const setupRow = q.environment === "testnet" ? await store.pool.query(
       "SELECT 1 FROM setup_jobs WHERE tx_hash=$1",
       [p.hash],
-    );
-    if (setupRow.rowCount && options.setup) return options.setup.status(p.hash);
+    ) : undefined;
+    if (setupRow?.rowCount && options.setup) return options.setup.status(p.hash);
     const row = await store.getAttempt(q.environment, p.hash);
     if (
       row?.state === "failed" ||
