@@ -7,6 +7,10 @@ Mierkhat prepares and tracks vault withdrawals on Stellar testnet. Users choose 
 
 This repository contains the Fastify API, PostgreSQL persistence, recovery workers and `@mierkhat/sdk`. The service never holds user wallet signing keys. It verifies signed transactions, stores exact retry bytes encrypted before sending them, and reconciles uncertain results by public transaction hash.
 
+## Post-rejection review
+
+See [the review plan](docs/REVIEW_PLAN.md) and [completed changes and verification](docs/RESUBMISSION.md) for this update against the rejected submission. Vercel is currently paused; use localhost for review.
+
 ## Stack
 
 | Component            | Technology                                      |
