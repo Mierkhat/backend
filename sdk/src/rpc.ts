@@ -192,6 +192,21 @@ export async function loadDeployment(
   ]);
   assert(digest(onchainProfile.toXDR()) === b.profileHash, "ProfileChanged");
   assert(scValToNative(shareDecimals) === b.shareDecimals, "ShareDecimals");
+  if (b.migration) {
+    const destinationDecimals = await readContract(
+      server,
+      b,
+      owner,
+      b.migration.destination.address,
+      "decimals",
+      [],
+      source,
+    );
+    assert(
+      scValToNative(destinationDecimals) === b.migration.destinationShareDecimals,
+      "DestinationShareDecimals",
+    );
+  }
   const account = await server.getAccountEntry(owner);
   const thresholds = account.thresholds.toBytes();
   assert(

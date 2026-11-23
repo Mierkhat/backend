@@ -336,6 +336,14 @@ export function restorationKeys(bundle: DeploymentBundle): xdr.LedgerKey[] {
       b.profile.router,
       b.profile.factory,
       ...b.profile.assets.flatMap((a) => (a.pair ? [a.pair] : [])),
+      ...(b.migration
+        ? [
+            b.migration.destination,
+            ...b.migration.destination_assets.flatMap((a) =>
+              a.pair ? [a.pair] : [],
+            ),
+          ]
+        : []),
     ];
   const instances = [
     ...new Set([

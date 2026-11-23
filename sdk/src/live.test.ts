@@ -11,6 +11,7 @@ import {
   verifySetup,
   verifySetupSigned,
   stellarAssets,
+  restorationKeys,
   type SetupReview,
 } from "./live.js";
 import { bundleSchema } from "./model.js";
@@ -23,6 +24,35 @@ import actual from "../fixtures/testnet-setup.json" with { type: "json" };
 const b = bundleSchema.parse(registry[0]);
 const reviews = actual.map((a) => ({ ...a, review: a.review as SetupReview }));
 const clone = <T>(v: T): T => structuredClone(v);
+
+it("restores every pinned migration dependency without duplicate ledger keys", () => {
+  for (const bundle of registry.filter((value) => !!value.migration)) {
+    const migration = bundleSchema.parse(bundle);
+    const keys = restorationKeys(migration);
+    const encoded = keys.map((key) => key.toXDR("base64"));
+    expect(new Set(encoded).size).toBe(encoded.length);
+    const pins = [
+      migration.migration!.destination,
+      ...migration.migration!.destination_assets.flatMap((asset) =>
+        asset.pair ? [asset.pair] : [],
+      ),
+    ];
+    for (const pin of pins) {
+      const instance = xdr.LedgerKey.contractData(
+        new xdr.LedgerKeyContractData({
+          contract: Address.fromString(pin.address).toScAddress(),
+          key: xdr.ScVal.scvLedgerKeyContractInstance(),
+          durability: xdr.ContractDataDurability.persistent,
+        }),
+      );
+      const code = xdr.LedgerKey.contractCode(
+        new xdr.LedgerKeyContractCode({ hash: pin.wasm_hash }),
+      );
+      expect(encoded).toContain(instance.toXDR("base64"));
+      expect(encoded).toContain(code.toXDR("base64"));
+    }
+  }
+});
 describe("actual signed testnet setup policies", () => {
   it("verifies committed trustline and deposit envelopes and signatures", () => {
     for (const a of reviews) {
