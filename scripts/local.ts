@@ -56,10 +56,14 @@ if (!process.env.TESTNET_FAUCET_KEY_FILE) {
     /* Read-only CI and standalone setups can run without an issuer secret. */
   }
 }
-await import("../src/server.js");
+const { shutdown } = await import("../src/server.js");
+let stoppingDatabase = false;
 for (const signal of ["SIGINT", "SIGTERM"] as const)
   process.once(signal, () => {
-    setTimeout(() => {
-      void pg.stop();
-    }, 2000);
+    if (stoppingDatabase) return;
+    stoppingDatabase = true;
+    void (async () => {
+      try { await shutdown(); }
+      finally { await pg.stop(); }
+    })().catch(() => { console.error("Local shutdown failed"); process.exitCode = 1; });
   });

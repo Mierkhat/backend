@@ -42,6 +42,12 @@ export const pool = new Pool({
   connectionTimeoutMillis: 5000,
   statement_timeout: 10000,
 });
+// Idle connection errors must not crash the service or print the client/config.
+pool.on("error", (error) => {
+  const value = "code" in error ? error.code : undefined;
+  const code = typeof value === "string" && /^[A-Z0-9_]{1,40}$/.test(value) ? value : "UNKNOWN";
+  console.error("PostgreSQL idle connection error:", code);
+});
 const store = new Store(pool, Buffer.from(payloadKey, "hex"));
 await store.migrate();
 const providers = new Providers(endpoints, networks);
@@ -108,12 +114,18 @@ if (!hosted)
     host: process.env.HOST ?? "127.0.0.1",
     port: Number(process.env.PORT ?? 3001),
   });
-for (const signal of ["SIGINT", "SIGTERM"])
-  process.once(signal, async () => {
-    stopping = true;
-    clearInterval(timer);
-    clearInterval(prune);
+let shutdownPromise: Promise<void> | undefined;
+export function shutdown(): Promise<void> {
+  if (shutdownPromise) return shutdownPromise;
+  stopping = true;
+  clearInterval(timer);
+  clearInterval(prune);
+  shutdownPromise = (async () => {
     await jobs.settle();
     await app.close();
     await pool.end();
-  });
+  })();
+  return shutdownPromise;
+}
+for (const signal of ["SIGINT", "SIGTERM"])
+  process.once(signal, () => { void shutdown().catch(() => { console.error("API shutdown failed"); process.exitCode = 1; }); });

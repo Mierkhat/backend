@@ -42,3 +42,13 @@ Unattended watch timing depends on an active scheduler; the checked-in daily
 Hobby cron alone cannot deliver minute-level checks. External partner validation,
 strategy-aware profiles, true archived-to-live restoration, independent review
 and mainnet approval remain separate development gates.
+
+## Additional finding from local restart validation
+
+On 24 November, stopping the local launcher shut PostgreSQL down after a fixed
+two-second delay while the API was still draining worker requests. The pool
+then emitted an unhandled idle-client error and the process exited with an
+internal client dump. Replace the timer with an awaited, idempotent API/worker/
+pool shutdown before stopping PostgreSQL. Handle idle pool errors using only a
+bounded public error code. Acceptance: build/script/API types, existing real
+PostgreSQL suite and clean local shutdown/restart while workers are enabled.
