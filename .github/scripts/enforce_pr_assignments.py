@@ -196,8 +196,9 @@ class Enforcement:
         if author in self.bots and (author not in TRUSTED_BOTS or pr["user"]["type"] == "Bot"):
             return True, "trusted helper bot"
 
-        refs = text_references(pr.get("body"), self.github.repository)
-        refs |= self.github.linked_issues(pr["number"])
+        body_refs = text_references(pr.get("body"), self.github.repository)
+        body_refs |= self.github.linked_issues(pr["number"])
+        refs = body_refs | text_references(pr.get("title"), self.github.repository)
         organization = self.github.repository.split("/", 1)[0].lower()
         # Outside issues cannot authorize a contribution to this organization.
         issues = []
@@ -211,7 +212,7 @@ class Enforcement:
                 return False, f"referenced issue {repo}#{number} could not be found"
             if "pull_request" not in issue:
                 issues.append((repo, number, issue))
-        if not any(repo.split("/", 1)[0] == organization for repo, *_ in issues):
+        if not any(repo.split("/", 1)[0] == organization and (repo, number) in body_refs for repo, number, _ in issues):
             return False, "no referenced issue in this organization; request assignment and link the issue"
         unassigned = [f"{repo}#{number}" for repo, number, issue in issues
                       if author not in {user["login"].lower() for user in issue["assignees"]}]

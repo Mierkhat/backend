@@ -34,7 +34,7 @@ def validate(name, text, bootstrap):
         raise ValueError("Policy jobs cannot override permissions")
     expressions = re.findall(r"\$\{\{(.*?)\}\}", text)
     for expression in expressions:
-        if "secrets." in expression or ("github.event." in expression and expression.strip() != "github.event.repository.default_branch"):
+        if ("secrets." in expression and not (name == "auto-merge-prs.yml" and expression.strip() == "secrets.MIERKHAT_ISSUE_COMPLETION_TOKEN")) or ("github.event." in expression and expression.strip() != "github.event.repository.default_branch"):
             raise ValueError("Untrusted event interpolation or secret in privileged workflow")
     for expected in (
         "POLICY_SHA: ${{ github.workflow_sha }}",

@@ -17,4 +17,6 @@ CI also scans secrets, checks workflow security, and tests the contributor autom
 
 Contributor PRs targeting another branch, missing an assigned issue, or referencing an issue you are not assigned to are automatically closed. Request assignment, correct the target or links, and reopen the PR. API outages preserve PRs for a retry.
 
+After merging into `dev`, the bot closes all real referenced Mierkhat frontend/backend/contracts issues still assigned to the original PR author, with reason `completed`. Failed closures are retried during periodic sweeps; assignees remain unchanged.
+
 The bot uses merge commits to preserve original contributor authors and commits. It does not rewrite attribution or issue assignees, add co-author trailers, or auto-merge changes to its own CI and security policy. Repository maintainers and authenticated helper bots have separate maintenance exemptions.

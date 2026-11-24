@@ -40,6 +40,11 @@ class ContributorPolicyTests(unittest.TestCase):
     def test_title_reference_does_not_replace_description_link(self):
         self.assertFalse(policy.Enforcement(FakeGitHub()).decision(pr(body="No issue", title="Closes #7"))[0])
 
+    def test_unassigned_title_issue_is_also_rejected(self):
+        github = FakeGitHub()
+        github.issues[("mierkhat/example", 8)] = {"assignees": [{"login": "someone-else"}]}
+        self.assertFalse(policy.Enforcement(github).decision(pr(body="Closes #7", title="Related #8"))[0])
+
     def test_every_referenced_issue_including_external_requires_assignment(self):
         github = FakeGitHub()
         github.issues[("outside/project", 8)] = {"assignees": [{"login": "someone-else"}]}
@@ -83,7 +88,8 @@ class ContributorPolicyTests(unittest.TestCase):
         original_assignees = list(github.issue["assignees"])
         admission = Mock()
         admission.decision.return_value = (True, "assigned")
-        self.assertTrue(merger.AutoMerge(github, admission, "dev").process(1).startswith("MERGED"))
+        with patch.object(merger.IssueCompletion, "process", return_value="COMPLETED: 0 issue(s)"):
+            self.assertTrue(merger.AutoMerge(github, admission, "dev").process(1).startswith("MERGED"))
         self.assertEqual(github.pr["user"], original_user)
         self.assertEqual(github.issue["assignees"], original_assignees)
         self.assertEqual(github.writes[0][2]["merge_method"], "merge")

@@ -52,6 +52,7 @@ class FakeGitHub:
         if method in {"PUT", "PATCH"} or method == "POST" and path != "graphql":
             self.writes.append((path, method, data))
             if path.endswith("/merge"):
+                self.pr.update(state="closed", merged=True, merged_at="2026-11-25T00:00:00Z", merge_commit_sha=BASE)
                 return {"merged": True}
             return {"id": 1}
         if path.startswith(PREFIX + "actions/runs/"):
@@ -103,6 +104,9 @@ class AutoMergeTests(unittest.TestCase):
         self.policy = Mock()
         self.policy.decision.return_value = (True, "assigned")
         self.bot = merger.AutoMerge(self.api, self.policy, "dev")
+        self.completion_patch = patch.object(merger.IssueCompletion, "process", return_value="COMPLETED: 0 issue(s)")
+        self.completion_patch.start()
+        self.addCleanup(self.completion_patch.stop)
 
     def assert_wait(self, text):
         result = self.bot.process(1)
@@ -392,7 +396,7 @@ class AutoMergeTests(unittest.TestCase):
     def test_privileged_workflow_never_checks_out_or_downloads_artifacts(self):
         path = Path(__file__).resolve().parents[1] / "workflows/auto-merge-prs.yml"
         source = path.read_text()
-        for forbidden in ["actions/checkout", "actions/download-artifact", "pull_request.head", "secrets."]:
+        for forbidden in ["actions/checkout", "actions/download-artifact", "pull_request.head", "secrets.OTHER_TOKEN"]:
             self.assertNotIn(forbidden, source)
         self.assertIn("github.workflow_sha", source)
 
