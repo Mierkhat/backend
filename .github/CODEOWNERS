@@ -15,3 +15,24 @@
 /guard/ @dotmantissa
 /migration/ @dotmantissa
 /sdk/src/generated/ @dotmantissa
+
+# Security policy and value-moving source always require owner review.
+/.semgrepignore @dotmantissa
+/src/ @dotmantissa
+/sdk/src/ @dotmantissa
+/api/ @dotmantissa
+/embed/src/ @dotmantissa
+/copy/src/ @dotmantissa
+/package.json @dotmantissa
+/sdk/package.json @dotmantissa
+/embed/package.json @dotmantissa
+/fixtures/ @dotmantissa
+/tests/ @dotmantissa
+/test/ @dotmantissa
+
+# Build/test configuration and nested manifests are also part of the trust boundary.
+**/package.json @dotmantissa
+**/Cargo.toml @dotmantissa
+/tsconfig*.json @dotmantissa
+/playwright*.ts @dotmantissa
+/vitest*.ts @dotmantissa
