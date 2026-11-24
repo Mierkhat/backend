@@ -128,3 +128,11 @@ it("promotes legacy terminal records and ignores corrupt terminal sidecars", () 
   expect(rememberPending(other, s)).toBe(true);
   expect(readPendingRecords(s)).toContainEqual(other);
 });
+
+it("prefers terminal sidecars over older legacy terminal records regardless of key order", () => {
+  const s = storage();
+  rememberObservation(pointer, { hash: pointer.hash, state: "succeeded", observedAt: pointer.createdAt }, s);
+  s.setItem(recoveryKey(pointer), JSON.stringify({ ...pointer, state: "failed", terminal: true }));
+  expect(readPendingRecords(s)[0]?.state).toBe("succeeded");
+  expect(readPendingRecords({ ...s, key: n => s.key(s.length - 1 - n) })[0]?.state).toBe("succeeded");
+});

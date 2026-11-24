@@ -57,7 +57,8 @@ export function readPendingRecords(
       const record = storedRecord(storage, key);
       if (!record) continue;
       const identity = recoveryKey(record), prior = records.get(identity);
-      if (!prior?.terminal || record.terminal) records.set(identity, record);
+      if (!prior?.terminal || (record.terminal && key === terminalKey(record)))
+        records.set(identity, record);
     }
   } catch {
     /* Storage access can be denied without invalidating in-memory tracking. */
