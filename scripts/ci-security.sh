@@ -12,15 +12,4 @@ curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 \
 printf '%s  %s\n' 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8 "$ci_tools/actionlint.tgz" | sha256sum --check
 tar -xzf "$ci_tools/actionlint.tgz" -C "$ci_tools" actionlint
 "$ci_tools/actionlint" -shellcheck=''
-python3 - <<'PY'
-from pathlib import Path
-import re
-for path in Path('.github/workflows').glob('*.y*ml'):
-    text = path.read_text()
-    for action in re.findall(r'uses:\s*([^\s#]+)', text):
-        if not re.fullmatch(r'[A-Za-z0-9_./-]+@[0-9a-f]{40}', action):
-            raise SystemExit(f'{path}: action must use a full commit SHA: {action}')
-    if 'pull_request_target' in text or 'write-all' in text:
-        raise SystemExit(f'{path}: privileged pull request workflows and write-all are forbidden')
-print('PASS: workflow syntax, action pins and credential-free pull request policy')
-PY
+python3 -B .github/scripts/check_workflow_security.py

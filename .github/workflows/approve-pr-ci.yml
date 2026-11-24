@@ -1,0 +1,94 @@
+name: Automatic PR CI
+
+on:
+  pull_request_target:
+    branches: [dev]
+    types: [opened, synchronize, reopened, edited, ready_for_review]
+  issues:
+    types: [assigned]
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Report decisions without changing pull requests
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+  actions: write
+
+concurrency:
+  group: approve_pr_ci-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  policy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Restrict policy network access
+        uses: step-security/harden-runner@aebdcf6156ab6691adf63218240e476564a1ed4c
+        with:
+          egress-policy: block
+          disable-sudo-and-containers: true
+          disable-telemetry: true
+          allowed-endpoints: api.github.com:443
+      - name: Run immutable contributor policy without checking out PR code
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          POLICY_SHA: ${{ github.workflow_sha }}
+          POLICY_REF: ${{ github.workflow_sha }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          PR_ASSIGNMENT_HELPER_BOTS: ${{ vars.PR_ASSIGNMENT_HELPER_BOTS }}
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && 'true' || 'false' }}
+          POLICY_MODULES: enforce_pr_assignments,approve_pr_ci
+          POLICY_ENTRYPOINT: approve_pr_ci
+        run: |
+          python3 -B - <<'PY'
+          import base64
+          import json
+          import os
+          import re
+          import sys
+          import types
+          import urllib.parse
+          import urllib.request
+
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self, *args, **kwargs):
+                  raise ValueError("Authenticated API redirect refused")
+
+          revision = os.environ["POLICY_SHA"]
+          if not re.fullmatch(r"[0-9a-f]{40}", revision):
+              raise ValueError("Invalid trusted workflow revision")
+          if os.environ["DEFAULT_BRANCH"] != "dev":
+              sys.exit("Contributor automation activates when dev is the default branch.")
+          allowed = {"enforce_pr_assignments", "check_pr_description", "approve_pr_ci", "auto_merge_prs"}
+          modules = os.environ["POLICY_MODULES"].split(",")
+          entrypoint = os.environ["POLICY_ENTRYPOINT"]
+          if entrypoint not in modules or not set(modules) <= allowed:
+              raise ValueError("Invalid trusted policy modules")
+          for module in modules:
+              path = ".github/scripts/" + module + ".py"
+              query = urllib.parse.urlencode({"ref": revision})
+              request = urllib.request.Request(
+                  "https://api.github.com/repos/" + os.environ["GITHUB_REPOSITORY"]
+                  + "/contents/" + path + "?" + query,
+                  headers={"Authorization": "Bearer " + os.environ["GITHUB_TOKEN"],
+                           "Accept": "application/vnd.github+json",
+                           "User-Agent": "mierkhat-contributor-policy"},
+              )
+              with urllib.request.build_opener(NoRedirect()).open(request, timeout=30) as response:
+                  content = json.load(response)
+              if content.get("type") != "file" or content.get("encoding") != "base64":
+                  raise ValueError("Trusted policy module unavailable")
+              source = base64.b64decode(content["content"])
+              loaded = types.ModuleType(module)
+              sys.modules[module] = loaded
+              exec(compile(source, path, "exec"), loaded.__dict__)
+          sys.exit(sys.modules[entrypoint].main())
+          PY

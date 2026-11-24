@@ -1,7 +1,6 @@
 # CI, deployment and dependency changes require the project owner.
 /.github/ @dotmantissa
 /scripts/ @dotmantissa
-/vercel.json @dotmantissa
 /pnpm-lock.yaml @dotmantissa
 /pnpm-workspace.yaml @dotmantissa
 /.vendor/ @dotmantissa
