@@ -32,28 +32,31 @@ class ContributorPolicyTests(unittest.TestCase):
         github.current = pr(body="Release setup", base={"ref": "main"})
         self.assertEqual(policy.Enforcement(github).enforce(github.current)[0], "KEEP")
 
-    def test_write_triage_and_member_contributors_still_need_assignment(self):
-        for permission in ("write", "triage", "read"):
+    def test_hyperion_repository_role_exemptions_apply_on_dev(self):
+        for permission in ("write", "triage"):
             github = FakeGitHub(assignees=(), permission=permission)
-            self.assertFalse(policy.Enforcement(github).decision(pr(author_association="MEMBER"))[0])
+            self.assertTrue(policy.Enforcement(github).decision(pr())[0])
+            self.assertFalse(policy.Enforcement(github).decision(pr(base={"ref": "main"}))[0])
+        for association in ("MEMBER", "COLLABORATOR"):
+            github = FakeGitHub(assignees=())
+            self.assertTrue(policy.Enforcement(github).decision(pr(author_association=association))[0])
+            self.assertFalse(policy.Enforcement(github).decision(pr(author_association=association, base={"ref": "main"}))[0])
 
-    def test_title_reference_does_not_replace_description_link(self):
-        self.assertFalse(policy.Enforcement(FakeGitHub()).decision(pr(body="No issue", title="Closes #7"))[0])
+    def test_hyperion_accepts_assigned_title_references(self):
+        self.assertTrue(policy.Enforcement(FakeGitHub()).decision(pr(body="Implementation", title="Closes #7"))[0])
 
     def test_unassigned_title_issue_is_also_rejected(self):
         github = FakeGitHub()
         github.issues[("mierkhat/example", 8)] = {"assignees": [{"login": "someone-else"}]}
         self.assertFalse(policy.Enforcement(github).decision(pr(body="Closes #7", title="Related #8"))[0])
 
-    def test_every_referenced_issue_including_external_requires_assignment(self):
+    def test_hyperion_ignores_external_references_for_pr_assignment(self):
         github = FakeGitHub()
         github.issues[("outside/project", 8)] = {"assignees": [{"login": "someone-else"}]}
-        self.assertFalse(policy.Enforcement(github).decision(pr(body="Closes #7; related outside/project#8"))[0])
-        github.issues[("outside/project", 8)]["assignees"] = [{"login": "contributor"}]
         self.assertTrue(policy.Enforcement(github).decision(pr(body="Closes #7; related outside/project#8"))[0])
 
-    def test_nonexistent_reference_is_closed_but_api_outage_is_preserved(self):
-        for code, closed in ((404, True), (503, False)):
+    def test_hyperion_preserves_pr_when_issue_lookup_cannot_be_verified(self):
+        for code in (404, 503):
             github = FakeGitHub()
             original = github.request
             def request(path, method="GET", data=None):
@@ -61,12 +64,9 @@ class ContributorPolicyTests(unittest.TestCase):
                     raise urllib.error.HTTPError("https://api.github.com/issue", code, "unavailable", {}, None)
                 return original(path, method, data)
             with patch.object(github, "request", side_effect=request):
-                if closed:
-                    self.assertEqual(policy.Enforcement(github).enforce(pr())[0], "CLOSE")
-                else:
-                    with self.assertRaises(urllib.error.HTTPError):
-                        policy.Enforcement(github).enforce(pr())
-                    self.assertEqual(github.updates, [])
+                with self.assertRaises(urllib.error.HTTPError):
+                    policy.Enforcement(github).enforce(pr())
+                self.assertEqual(github.updates, [])
 
     def test_helper_bot_also_targets_dev(self):
         value = pr(author="dependabot[bot]", body="", user={"login": "dependabot[bot]", "type": "Bot"}, base={"ref": "main"})

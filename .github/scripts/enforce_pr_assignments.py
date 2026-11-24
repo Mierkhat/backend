@@ -20,7 +20,7 @@ TRUSTED_BOTS = {
     "copilot",
     "coderabbitai[bot]",
 }
-TRUSTED_ASSOCIATIONS = {"OWNER"}
+TRUSTED_ASSOCIATIONS = {"OWNER", "MEMBER", "COLLABORATOR"}
 REFERENCE = re.compile(
     r"https://github\.com/(?P<url_owner>[\w.-]+)/(?P<url_repo>[\w.-]+)/issues/(?P<url_number>[1-9]\d*)\b"
     r"|(?<![\w/])(?P<owner>[\w.-]+)/(?P<repo>[\w.-]+)#(?P<number>[1-9]\d*)\b"
@@ -182,37 +182,40 @@ class Enforcement:
     def decision(self, pr):
         author = pr["user"]["login"].lower()
         # Only maintainers may target the protected release branch.
-        permission = self.github.request(
-            f"repos/{self.github.repository}/collaborators/{urllib.parse.quote(author, safe='')}/permission"
-        )
-        maintainer = (pr.get("author_association") in TRUSTED_ASSOCIATIONS
-                      or author in self.owners or permission["permission"] in {"admin", "maintain"})
-        if maintainer:
+        if pr.get("author_association") == "OWNER" or author in self.owners:
             return True, "repository maintainer"
         base = pr.get("base") or {}
         default_branch = getattr(self.github, "default_branch", "dev")
-        if base.get("ref") != default_branch or base.get("repo", {}).get("full_name", "").lower() != self.github.repository.lower():
+        targets_dev = (base.get("ref") == default_branch
+                       and base.get("repo", {}).get("full_name", "").lower() == self.github.repository.lower())
+        helper = author in self.bots and (author not in TRUSTED_BOTS or pr["user"]["type"] == "Bot")
+        if helper:
+            return ((True, "trusted helper bot") if targets_dev else
+                    (False, "contributor pull requests must target " + default_branch))
+        permission = self.github.request(
+            f"repos/{self.github.repository}/collaborators/{urllib.parse.quote(author, safe='')}/permission"
+        )
+        if permission["permission"] in {"admin", "maintain"}:
+            return True, "repository maintainer"
+        if not targets_dev:
             return False, "contributor pull requests must target " + default_branch
-        if author in self.bots and (author not in TRUSTED_BOTS or pr["user"]["type"] == "Bot"):
-            return True, "trusted helper bot"
+        if pr.get("author_association") in TRUSTED_ASSOCIATIONS:
+            return True, "organization member or repository collaborator"
+        if permission["permission"] in {"write", "triage"}:
+            return True, "repository role"
 
-        body_refs = text_references(pr.get("body"), self.github.repository)
-        body_refs |= self.github.linked_issues(pr["number"])
-        refs = body_refs | text_references(pr.get("title"), self.github.repository)
+        refs = text_references(pr.get("title"), self.github.repository)
+        refs |= text_references(pr.get("body"), self.github.repository)
+        refs |= self.github.linked_issues(pr["number"])
         organization = self.github.repository.split("/", 1)[0].lower()
         # Outside issues cannot authorize a contribution to this organization.
+        refs = {(repo, number) for repo, number in refs if repo.split("/", 1)[0] == organization}
         issues = []
         for repo, number in sorted(refs):
-            try:
-                issue = self.github.request(f"repos/{repo}/issues/{number}")
-            except urllib.error.HTTPError as error:
-                if error.code != 404:
-                    raise
-                error.close()
-                return False, f"referenced issue {repo}#{number} could not be found"
+            issue = self.github.request(f"repos/{repo}/issues/{number}")
             if "pull_request" not in issue:
                 issues.append((repo, number, issue))
-        if not any(repo.split("/", 1)[0] == organization and (repo, number) in body_refs for repo, number, _ in issues):
+        if not issues:
             return False, "no referenced issue in this organization; request assignment and link the issue"
         unassigned = [f"{repo}#{number}" for repo, number, issue in issues
                       if author not in {user["login"].lower() for user in issue["assignees"]}]

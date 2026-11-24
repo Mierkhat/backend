@@ -370,8 +370,8 @@ class IssueCompletion:
 
     Mentions in comments/fenced examples, repositories outside this project and PR references
     are excluded by the same reference parser and real-issue checks as admission.
-    Every target must still be assigned to the original PR author, even when
-    that author has a maintainer role. Successful current-head PR CI and all
+    Every real referenced issue must still be assigned to the original PR author,
+    even when that author has a maintainer role. Successful current-head PR CI and all
     head checks are required for reconciliation as well as immediate completion.
     Assignees, PR authors and commit history are never modified.
     """
@@ -381,6 +381,19 @@ class IssueCompletion:
         self.prefix = f"repos/{github.repository}/"
         token = os.environ.get("ISSUE_COMPLETION_TOKEN")
         self.writer = GitHub(token, github.repository, github.policy_ref) if token else github
+
+    def references(self, pr):
+        refs = text_references(pr.get("body"), self.github.repository)
+        refs |= text_references(pr.get("title"), self.github.repository)
+        return refs | self.github.linked_issues(pr["number"])
+
+    def all_assigned(self, refs, author):
+        for repo, number in sorted(refs):
+            issue = self.github.request(f"repos/{repo}/issues/{number}")
+            if ("pull_request" not in issue
+                    and author not in {user["login"].lower() for user in issue["assignees"]}):
+                return False
+        return True
 
     def process(self, number, dry_run=False):
         if type(number) is not int or number <= 0:
@@ -400,15 +413,15 @@ class IssueCompletion:
                 or comparison.get("status") not in {"ahead", "identical"}):
             raise ValueError("Merged revision is not on the current default branch")
         author = pr["user"]["login"].lower()
-        refs = text_references(pr.get("body"), self.github.repository)
-        refs |= text_references(pr.get("title"), self.github.repository)
-        refs |= self.github.linked_issues(number)
-        refs = {(repo, issue) for repo, issue in refs if repo in ISSUE_REPOSITORIES}
+        refs = self.references(pr)
         candidates = []
         for repo, issue_number in sorted(refs):
             issue = self.github.request(f"repos/{repo}/issues/{issue_number}")
-            if ("pull_request" not in issue
-                    and author in {user["login"].lower() for user in issue["assignees"]}
+            if "pull_request" in issue:
+                continue
+            if author not in {user["login"].lower() for user in issue["assignees"]}:
+                return "WAIT: author is not assigned to every referenced issue; issues preserved"
+            if (repo in ISSUE_REPOSITORIES
                     and not (issue.get("state") == "closed" and issue.get("state_reason") == "completed")):
                 candidates.append((repo, issue_number))
         if not candidates:
@@ -423,12 +436,19 @@ class IssueCompletion:
         completed, errors = 0, []
         for repo, issue_number in candidates:
             try:
+                # A late assignment revocation anywhere blocks every remaining write.
+                # Re-read PR references too: descriptions can change after merging.
+                latest = self.github.request(self.prefix + f"pulls/{number}")
+                if state(latest) != state(pr) or self.references(latest) != refs:
+                    return "WAIT: PR references changed; issues preserved"
+                if not self.all_assigned(refs, author):
+                    return "WAIT: author is not assigned to every referenced issue; issues preserved"
                 endpoint = f"repos/{repo}/issues/{issue_number}"
                 issue = self.github.request(endpoint)
                 if "pull_request" in issue:
                     continue
                 if author not in {user["login"].lower() for user in issue["assignees"]}:
-                    continue
+                    return "WAIT: author is not assigned to every referenced issue; issues preserved"
                 # Native GitHub closing keywords may already have completed it.
                 if issue.get("state") == "closed" and issue.get("state_reason") == "completed":
                     continue

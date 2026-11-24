@@ -1,6 +1,6 @@
 # Contributing to Mierkhat
 
-1. Choose an issue and request assignment before starting. You must be assigned every real issue referenced in your PR description, including linked issues from sibling repositories.
+1. Choose an issue and request assignment before starting. You must be assigned every real Mierkhat issue referenced in your PR title, description, or linked issues, including sibling repositories.
 2. Fork the repository, fetch upstream `dev`, and create a feature branch from `dev`. Keep each PR focused on its assigned issue.
 3. Implement the change and run the local checks below. Install the versions pinned by this repository, then run `pnpm install --frozen-lockfile`.
 4. Open the PR against **`dev` only** and complete the PR template. Describe the change, why it is needed, assigned issue links such as `Closes #42`, and the commands and results used to verify it.
@@ -17,6 +17,6 @@ CI also scans secrets, checks workflow security, and tests the contributor autom
 
 Contributor PRs targeting another branch, missing an assigned issue, or referencing an issue you are not assigned to are automatically closed. Request assignment, correct the target or links, and reopen the PR. API outages preserve PRs for a retry.
 
-After merging into `dev`, the bot closes all real referenced Mierkhat frontend/backend/contracts issues still assigned to the original PR author, with reason `completed`. Failed closures are retried during periodic sweeps; assignees remain unchanged.
+After a verified merge into `dev`, the bot closes referenced frontend/backend/contracts issues as `completed` only when all PR checks pass and every real referenced issue is still assigned to the original contributor. Any unassigned issue blocks all remaining closures. Failed closures are retried; assignees remain unchanged.
 
-The bot uses merge commits to preserve original contributor authors and commits. It does not rewrite attribution or issue assignees, add co-author trailers, or auto-merge changes to its own CI and security policy. Repository maintainers and authenticated helper bots have separate maintenance exemptions.
+The bot uses merge commits to preserve original contributor authors and commits. It does not rewrite attribution or issue assignees, add co-author trailers, or auto-merge changes to its own CI and security policy. Assignment enforcement mirrors Hyperion's repository-role and authenticated helper-bot exemptions; auto-merge and issue completion still require every referenced issue to be assigned.

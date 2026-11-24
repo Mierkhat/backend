@@ -111,7 +111,7 @@ class IssueCompletionTests(unittest.TestCase):
         self.api.pr.update(state="closed", merged=True, merged_at="2026-11-24T01:00:00Z", merge_commit_sha=BASE)
         self.bot = merger.IssueCompletion(self.api, "dev")
 
-    def test_only_issues_assigned_to_original_author_are_completed(self):
+    def test_one_unassigned_reference_blocks_all_issue_completion(self):
         self.api.pr["body"] = "Closes #42. Related #43, #44, #45. outside/other#46"
         self.api.refs = {(REPO.lower(), 47)}
         self.api.issues = {
@@ -119,8 +119,12 @@ class IssueCompletionTests(unittest.TestCase):
             "44": {**self.api.issue, "assignees": []},
             "45": {**self.api.issue, "pull_request": {}},
             "47": {**self.api.issue, "assignees": [{"login": "ALICE"}, {"login": "bob"}]}}
-        self.assertEqual(self.bot.process(1), "COMPLETED: 2 issue(s)")
-        self.assertEqual([path.rsplit("/", 1)[1] for path, _, _ in self.api.writes], ["42", "47"])
+        self.assertTrue(self.bot.process(1).startswith("WAIT"))
+        self.assertEqual(self.api.writes, [])
+        for number in ("43", "44"):
+            self.api.issues[number]["assignees"] = [{"login": "alice"}]
+        self.assertEqual(self.bot.process(1), "COMPLETED: 4 issue(s)")
+        self.assertEqual([path.rsplit("/", 1)[1] for path, _, _ in self.api.writes], ["42", "43", "44", "47"])
         for _, method, data in self.api.writes:
             self.assertEqual(method, "PATCH")
             self.assertEqual(data, {"state": "closed", "state_reason": "completed"})
@@ -157,7 +161,7 @@ class IssueCompletionTests(unittest.TestCase):
     def test_maintainer_role_does_not_exempt_assignment_requirement(self):
         self.api.pr["author_association"] = "OWNER"
         self.api.issue["assignees"] = [{"login": "bob"}]
-        self.assertEqual(self.bot.process(1), "COMPLETED: 0 issue(s)")
+        self.assertTrue(self.bot.process(1).startswith("WAIT"))
         self.assertEqual(self.api.writes, [])
 
     def test_unmerged_closed_draft_open_and_wrong_base_are_preserved(self):
@@ -204,7 +208,37 @@ class IssueCompletionTests(unittest.TestCase):
             self.api.issue["assignees"] = [{"login": "bob"}]
             return verifier(bot, candidate)
         with patch.object(merger.AutoMerge, "current_ci", revoke):
-            self.assertEqual(self.bot.process(1), "COMPLETED: 0 issue(s)")
+            self.assertTrue(self.bot.process(1).startswith("WAIT"))
+        self.assertEqual(self.api.writes, [])
+
+    def test_revoking_a_different_issue_during_checks_blocks_first_closure(self):
+        self.api.pr["body"] = "Closes #42 and #43"
+        self.api.issues["43"] = copy.deepcopy(self.api.issue)
+        verifier = merger.AutoMerge.current_ci
+        def revoke(bot, candidate):
+            self.api.issues["43"]["assignees"] = [{"login": "bob"}]
+            return verifier(bot, candidate)
+        with patch.object(merger.AutoMerge, "current_ci", revoke):
+            self.assertTrue(self.bot.process(1).startswith("WAIT"))
+        self.assertEqual(self.api.writes, [])
+        self.assertEqual(self.api.issue["state"], "open")
+
+    def test_postmerge_description_edit_blocks_stale_issue_completion(self):
+        verifier = merger.AutoMerge.current_ci
+        def edit(bot, candidate):
+            self.api.pr["body"] = "Closes #42 and #43"
+            return verifier(bot, candidate)
+        with patch.object(merger.AutoMerge, "current_ci", edit):
+            self.assertTrue(self.bot.process(1).startswith("WAIT"))
+        self.assertEqual(self.api.writes, [])
+
+    def test_postmerge_linked_issue_change_blocks_stale_completion(self):
+        verifier = merger.AutoMerge.current_ci
+        def link(bot, candidate):
+            self.api.refs.add((REPO.lower(), 43))
+            return verifier(bot, candidate)
+        with patch.object(merger.AutoMerge, "current_ci", link):
+            self.assertTrue(self.bot.process(1).startswith("WAIT"))
         self.assertEqual(self.api.writes, [])
 
     def test_closed_not_planned_is_marked_completed_only_when_assigned(self):
@@ -260,7 +294,6 @@ class IssueCompletionTests(unittest.TestCase):
         self.api.pr["body"] = "Related Mierkhat/other#43 and outside/project#44"
         self.assertEqual(self.bot.process(1), "COMPLETED: 0 issue(s)")
         self.assertEqual(self.api.writes, [])
-        self.assertFalse(any("/issues/" in path for path in self.api.reads))
 
     def test_failed_closure_retries_without_remerging(self):
         original = self.api.request
