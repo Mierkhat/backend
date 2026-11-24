@@ -9,7 +9,7 @@ import { SetupService } from "./setup.js";
 import { WatchService } from "./watches.js";
 import { reconcileOne } from "./worker.js";
 import { createJobRunner, registerScheduledJobs } from "./jobs.js";
-import { closePool } from "./close-pool.js";
+import { closePool, trackPool } from "./close-pool.js";
 const hosted = process.env.VERCEL === "1";
 const databaseUrl = process.env.DATABASE_URL;
 const payloadKey = process.env.PAYLOAD_KEY;
@@ -37,12 +37,12 @@ const endpoints: Record<string, string[]> = {
 const networks = Object.fromEntries(
   bundles.map((b) => [b.environment, b.networkPassphrase]),
 );
-export const pool = new Pool({
+export const pool = trackPool(new Pool({
   connectionString: databaseUrl,
   max: hosted ? 3 : 10,
   connectionTimeoutMillis: 5000,
   statement_timeout: 10000,
-});
+}));
 // Idle connection errors must not crash the service or print the client/config.
 pool.on("error", (error) => {
   const value = "code" in error ? error.code : undefined;

@@ -16,7 +16,7 @@ import actualSetup from "../sdk/fixtures/testnet-setup.json" with { type: "json"
 import registry from "../sdk/deployments/index.json" with { type: "json" };
 import { WatchService } from "../src/watches.js";
 import { Providers } from "../src/providers.js";
-import { closePool } from "../src/close-pool.js";
+import { closePool, trackPool } from "../src/close-pool.js";
 let postgres: EmbeddedPostgres, pool: Pool, store: Store, directory: string;
 beforeAll(async () => {
   directory = await mkdtemp(join(tmpdir(), "mierkhat-pg-"));
@@ -42,14 +42,14 @@ beforeAll(async () => {
   });
   await postgres.initialise();
   await postgres.start();
-  pool = new Pool({
+  pool = trackPool(new Pool({
     host: "127.0.0.1",
     port,
     user: "postgres",
     password,
     database: "postgres",
     max: 5,
-  });
+  }));
   store = new Store(pool, randomBytes(32));
   await store.migrate();
   await store.migrate();
