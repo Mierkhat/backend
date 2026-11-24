@@ -4,11 +4,16 @@ import argparse
 import hashlib
 import io
 import json
+import os
 from pathlib import Path
 import re
 import subprocess
 import tarfile
+import time
+import urllib.error
 import urllib.request
+from urllib.parse import urlparse
+from email.utils import parsedate_to_datetime
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -16,6 +21,57 @@ ROOT = Path(__file__).resolve().parents[1]
 def check(condition, message):
     if not condition:
         raise ValueError(message)
+
+
+class PublicRedirects(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, request, fp, code, message, headers, url):
+        target = urlparse(url)
+        if request.has_header("Authorization") and (
+            target.scheme != "https" or target.hostname != "api.github.com"
+        ):
+            raise ValueError("Authenticated GitHub API redirect rejected")
+        return super().redirect_request(request, fp, code, message, headers, url)
+
+
+def fetch_bytes(url):
+    headers = {"Accept": "application/vnd.github+json"}
+    target = urlparse(url)
+    token = os.environ.get("GITHUB_TOKEN")
+    if token and target.scheme == "https" and target.hostname == "api.github.com":
+        headers["Authorization"] = "Bearer " + token
+    opener = urllib.request.build_opener(PublicRedirects())
+    deadline = time.monotonic() + 120
+    for attempt in range(3):
+        delay = 2 ** attempt
+        try:
+            with opener.open(urllib.request.Request(url, headers=headers), timeout=30) as response:
+                return response.read()
+        except urllib.error.HTTPError as error:
+            rate_limited = error.code == 429 or (
+                error.code == 403 and error.headers.get("X-RateLimit-Remaining") == "0"
+            )
+            retryable = rate_limited or error.code in (408, 500, 502, 503, 504)
+            if not retryable:
+                raise
+            retry_after = error.headers.get("Retry-After")
+            reset = error.headers.get("X-RateLimit-Reset") if rate_limited else None
+            try:
+                if retry_after:
+                    try:
+                        delay = max(delay, float(retry_after))
+                    except ValueError:
+                        delay = max(delay, parsedate_to_datetime(retry_after).timestamp() - time.time())
+                elif reset:
+                    delay = max(delay, float(reset) - time.time() + 1)
+            except (ValueError, TypeError, OverflowError):
+                pass
+            finally:
+                error.close()
+        except (urllib.error.URLError, TimeoutError):
+            pass
+        if attempt == 2 or time.monotonic() + delay + 30 > deadline:
+            raise RuntimeError("Pinned compatibility read unavailable within retry budget")
+        time.sleep(delay)
 
 
 def main():
@@ -34,8 +90,7 @@ def main():
         if args.siblings:
             return subprocess.check_output(["git", "show", f"{pins[name]}:{path}"], cwd=args.siblings / name)
         url = f"https://raw.githubusercontent.com/Mierkhat/{name}/{pins[name]}/{path}"
-        with urllib.request.urlopen(url, timeout=45) as response:
-            return response.read()
+        return fetch_bytes(url)
 
     def document(name, path):
         return json.loads(read(name, path))
@@ -76,8 +131,7 @@ def main():
         sdk_tree = subprocess.check_output(["git", "rev-parse", pins["backend"] + ":sdk"], cwd=args.siblings / "backend", text=True).strip()
     else:
         url = "https://api.github.com/repos/Mierkhat/backend/git/trees/" + pins["backend"]
-        with urllib.request.urlopen(urllib.request.Request(url, headers={"Accept": "application/vnd.github+json"}), timeout=45) as response:
-            tree = json.load(response)["tree"]
+        tree = json.loads(fetch_bytes(url))["tree"]
         sdk_tree = next(t["sha"] for t in tree if t["path"] == "sdk" and t["type"] == "tree")
     check(sdk_tree == manifest["source_sdk_tree"], "SDK source tree differs; repack and update provenance before release")
     print("PASS: immutable sibling revisions, testnet pins, contract evidence, SDK checksum/source tree and both ABIs")
