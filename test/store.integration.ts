@@ -16,6 +16,7 @@ import actualSetup from "../sdk/fixtures/testnet-setup.json" with { type: "json"
 import registry from "../sdk/deployments/index.json" with { type: "json" };
 import { WatchService } from "../src/watches.js";
 import { Providers } from "../src/providers.js";
+import { closePool } from "../src/close-pool.js";
 let postgres: EmbeddedPostgres, pool: Pool, store: Store, directory: string;
 beforeAll(async () => {
   directory = await mkdtemp(join(tmpdir(), "mierkhat-pg-"));
@@ -54,7 +55,7 @@ beforeAll(async () => {
   await store.migrate();
 });
 afterAll(async () => {
-  await pool?.end();
+  if (pool) await closePool(pool);
   await postgres?.stop();
   if (directory) await rm(directory, { recursive: true, force: true });
 });
@@ -146,8 +147,7 @@ it("serves real HTTP through the Vercel adapter with persistent database access 
     expect((await unknownEpoch.json()).code).toBe("UnsupportedDeployment");
   } finally {
     await new Promise<void>((resolve) => server.close(() => resolve()));
-    await runtime.app.close();
-    await runtime.pool.end();
+    await runtime.shutdown();
     for (const [key, value] of Object.entries(prior))
       if (value === undefined) delete process.env[key];
       else process.env[key] = value;
@@ -498,6 +498,59 @@ describe("durable private withdrawal watches", () => {
     const b = sdkFixture().bundle;
     return { service: new WatchService(pool, new Providers({}, {}), [b]), b };
   }
+  it("admits only the remaining capacity across concurrent database connections", async () => {
+    const { service: s, b } = service();
+    const input = {
+      owner: sdkFixture().draft.intent.owner,
+      epoch: b.epoch,
+      kind: "exit" as const,
+      sharesRaw: "100",
+      minimumRaw: "1",
+      movementBps: 50,
+    };
+    const seed = await s.create(input, randomBytes(32).toString("hex"));
+    await pool.query(
+      `INSERT INTO withdrawal_watches(id,capability_hash,owner,epoch,kind,shares_raw,minimum_raw,movement_bps,expires_at)
+       SELECT gen_random_uuid(),capability_hash,owner,epoch,kind,shares_raw,minimum_raw,movement_bps,
+         CASE WHEN n<=998 THEN now()+interval '1 hour' ELSE now()-interval '1 second' END
+       FROM withdrawal_watches CROSS JOIN generate_series(1,1000) n WHERE id=$1`,
+      [seed.id],
+    );
+    // Pause insertion after admission has been evaluated, so competing
+    // statements cannot accidentally pass by running one after another.
+    const blocker = await pool.connect();
+    await blocker.query(`CREATE FUNCTION test_watch_gate() RETURNS trigger LANGUAGE plpgsql AS
+      $$ BEGIN PERFORM pg_advisory_xact_lock(742815); RETURN NEW; END $$;
+      CREATE TRIGGER test_watch_gate BEFORE INSERT ON withdrawal_watches
+      FOR EACH ROW EXECUTE FUNCTION test_watch_gate()`);
+    await blocker.query("SELECT pg_advisory_lock(742815)");
+    const pending = Promise.allSettled(
+      Array.from({ length: 3 }, () => s.create(input, randomBytes(32).toString("hex"))),
+    );
+    try {
+      for (let attempt = 0; attempt < 100; attempt++) {
+        const waits = await blocker.query(
+          "SELECT count(*) FROM pg_stat_activity WHERE datname=current_database() AND wait_event_type='Lock' AND pid<>pg_backend_pid()",
+        );
+        if (Number(waits.rows[0].count) === 3) break;
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        if (attempt === 99) throw Error("Concurrent contenders did not reach admission");
+      }
+    } finally {
+      await blocker.query("SELECT pg_advisory_unlock(742815)");
+      blocker.release();
+    }
+    const results = await pending;
+    await pool.query("DROP TRIGGER test_watch_gate ON withdrawal_watches; DROP FUNCTION test_watch_gate()");
+    expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+    const rejected = results.filter((r) => r.status === "rejected");
+    expect(rejected).toHaveLength(2);
+    for (const result of rejected) expect(result.reason.message).toBe("WatchCapacity");
+    expect((await pool.query("SELECT count(*) FROM withdrawal_watches WHERE expires_at>now()" )).rows[0].count).toBe("1000");
+    expect(await s.remove(seed.id, "incorrect-capability")).toBe(false);
+    await pool.query("UPDATE withdrawal_watches SET expires_at=now()-interval '1 second' WHERE id=$1", [seed.id]);
+    await expect(s.create(input, randomBytes(32).toString("hex"))).resolves.toHaveProperty("id");
+  });
   it("isolates capability access, persists across instances and deletes observations", async () => {
     const { service: s, b } = service(),
       key = randomBytes(32).toString("hex");

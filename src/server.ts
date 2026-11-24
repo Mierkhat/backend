@@ -9,6 +9,7 @@ import { SetupService } from "./setup.js";
 import { WatchService } from "./watches.js";
 import { reconcileOne } from "./worker.js";
 import { createJobRunner, registerScheduledJobs } from "./jobs.js";
+import { closePool } from "./close-pool.js";
 const hosted = process.env.VERCEL === "1";
 const databaseUrl = process.env.DATABASE_URL;
 const payloadKey = process.env.PAYLOAD_KEY;
@@ -123,7 +124,7 @@ export function shutdown(): Promise<void> {
   shutdownPromise = (async () => {
     await jobs.settle();
     await app.close();
-    await pool.end();
+    await closePool(pool);
   })();
   return shutdownPromise;
 }

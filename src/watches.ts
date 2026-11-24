@@ -38,7 +38,13 @@ export class WatchService {
     if (!b || !!b.migration !== (input.kind === "migration"))
       throw new MierkhatError("WatchRoute", "route.unsupported");
     const id = randomUUID();
-    const result = await this.pool.query(
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN ISOLATION LEVEL READ COMMITTED");
+      // All API instances share this quota. Take a fresh snapshot only after
+      // obtaining admission, rather than racing count-and-insert statements.
+      await client.query("SELECT pg_advisory_xact_lock(742814)");
+      const result = await client.query(
       `INSERT INTO withdrawal_watches(id,capability_hash,owner,epoch,kind,shares_raw,minimum_raw,movement_bps,expires_at)
       SELECT $1,$2,$3,$4,$5,$6,$7,$8,now()+interval '7 days'
       WHERE (SELECT count(*) FROM withdrawal_watches WHERE expires_at>now())<1000 RETURNING id,expires_at`,
@@ -53,8 +59,15 @@ export class WatchService {
         input.movementBps,
       ],
     );
-    if (!result.rowCount) throw Error("WatchCapacity");
-    return { id, expiresAt: result.rows[0].expires_at };
+      if (!result.rowCount) throw Error("WatchCapacity");
+      await client.query("COMMIT");
+      return { id, expiresAt: result.rows[0].expires_at };
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
   }
   async read(id: string, key: string) {
     const row = (
