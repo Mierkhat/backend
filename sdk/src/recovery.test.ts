@@ -91,3 +91,40 @@ it("replaces a corrupt record at the same hash instead of treating available sto
   expect(rememberPending(pointer, s)).toBe(true);
   expect(readPendingRecords(s)).toEqual([pointer]);
 });
+
+it("keeps terminal evidence when another tab writes after reading an old pending value", () => {
+  const s = storage();
+  rememberPending(pointer, s);
+  let raced = false;
+  const otherTab = {
+    getItem(key: string) {
+      const old = s.getItem(key);
+      if (!raced && key === recoveryKey(pointer)) {
+        raced = true;
+        expect(rememberObservation(pointer, {
+          hash: pointer.hash, state: "succeeded", observedAt: pointer.createdAt,
+        }, s)).toBe(true);
+      }
+      return old;
+    },
+    setItem: s.setItem,
+  };
+  expect(rememberPending({ ...pointer, state: "unknown" }, otherTab)).toBe(true);
+  expect(JSON.parse(s.getItem(recoveryKey(pointer))!).state).toBe("unknown");
+  const reloaded = readPendingRecords(s);
+  expect(reloaded).toHaveLength(1);
+  expect(reloaded[0]).toMatchObject({ terminal: true, state: "succeeded" });
+});
+
+it("promotes legacy terminal records and ignores corrupt terminal sidecars", () => {
+  const s = storage();
+  const legacy = { ...pointer, state: "failed", terminal: true };
+  s.setItem(recoveryKey(pointer), JSON.stringify(legacy));
+  expect(rememberPending(pointer, s)).toBe(true);
+  s.setItem(recoveryKey(pointer), JSON.stringify(pointer));
+  expect(readPendingRecords(s)).toEqual([legacy]);
+  const other = { ...pointer, hash: "ab".repeat(32) };
+  s.setItem(`mierkhat.terminal.testnet.${other.hash}`, "{");
+  expect(rememberPending(other, s)).toBe(true);
+  expect(readPendingRecords(s)).toContainEqual(other);
+});
