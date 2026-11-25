@@ -13,7 +13,7 @@ pnpm --filter @mierkhat/sdk test
 pnpm build
 ```
 
-CI also scans secrets, checks workflow security, and tests the contributor automation. CI or automation changes require maintainer review. Deeper compatibility, browser/evidence, and release checks remain on `main`.
+Dev CI gates basic build/type/format checks, immutable lockfile integrity, known malicious dependencies, secrets, workflow security, and the PR description. Dependency installation follows the security gate with install scripts disabled. Full application/integration and contributor-policy regression suites run on main. CI or automation changes require maintainer review. Deeper compatibility, browser/evidence, and release checks remain on `main`.
 
 Contributor PRs targeting another branch, missing an assigned issue, or referencing an issue you are not assigned to are automatically closed. Request assignment, correct the target or links, and reopen the PR. API outages preserve PRs for a retry.
 

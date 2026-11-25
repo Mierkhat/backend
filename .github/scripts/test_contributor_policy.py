@@ -94,6 +94,33 @@ class ContributorPolicyTests(unittest.TestCase):
         self.assertEqual(github.issue["assignees"], original_assignees)
         self.assertEqual(github.writes[0][2]["merge_method"], "merge")
 
+    def test_dependency_release_note_numbers_are_not_local_issue_claims(self):
+        github = MergeGitHub()
+        github.pr.update(title="Bump actions/upload-artifact", body='<details><summary>Commits</summary><a href="https://redirect.github.com/actions/upload-artifact/issues/822">#822</a></details>')
+        github.pr["user"] = {"login": "dependabot[bot]", "type": "Bot"}
+        self.assertEqual(merger.issue_references(github.pr, github), set())
+        self.assertEqual(merger.AutoMerge(github, Mock(), "dev").issues(github.pr), ())
+        github.pr["body"] += "\nRelated #42"
+        self.assertEqual(merger.issue_references(github.pr, github), {(github.repository.lower(), 42)})
+        github.refs = {(github.repository.lower(), 42)}
+        self.assertEqual(merger.issue_references(github.pr, github), github.refs)
+
+    def test_dependency_bot_name_does_not_exempt_human_issue_claims(self):
+        github = MergeGitHub()
+        github.pr.update(title="Dependency change", body="Related #42")
+        github.pr["user"] = {"login": "dependabot[bot]", "type": "User"}
+        self.assertEqual(merger.issue_references(github.pr, github), {(github.repository.lower(), 42)})
+
+    def test_http_diagnostic_omits_url_credentials_and_query(self):
+        error = urllib.error.HTTPError("https://secret@api.github.com/repos/example/issues/42?token=secret", 404, "missing", {}, None)
+        self.assertEqual(merger.failure_reason(error), "HTTP 404 at /repos/example/issues/42")
+
+    def test_auto_merge_does_not_comment_on_release_branch_prs(self):
+        github = MergeGitHub()
+        github.pr["base"]["ref"] = "main"
+        self.assertTrue(merger.AutoMerge(github, Mock(), "dev").process(1).startswith("SKIP"))
+        self.assertEqual(github.writes, [])
+
 
 class WorkflowBoundaryTests(unittest.TestCase):
     def setUp(self):

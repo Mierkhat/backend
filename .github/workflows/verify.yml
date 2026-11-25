@@ -23,6 +23,7 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
       - run: ./scripts/ci-security.sh
+      - run: python3 -B -m unittest discover -s .github/scripts -p "test_*.py"
   compatibility:
     runs-on: ubuntu-24.04
     timeout-minutes: 5

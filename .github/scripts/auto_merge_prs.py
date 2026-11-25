@@ -66,6 +66,25 @@ def safe_text(value):
     return html.escape(value, quote=False).replace("@", "&#64;")
 
 
+def issue_references(pr, github):
+    user = pr["user"]
+    refs = text_references(pr.get("title"), github.repository)
+    # Authenticated dependency bots import upstream release notes and commit
+    # links. Their rendered issue-number labels are not contributor claims.
+    body = pr.get("body") or ""
+    if user["type"] == "Bot" and user["login"].lower() in DEPENDENCY_BOTS:
+        body = re.sub(r"<details\b[^>]*>\s*<summary>\s*(?:Release notes|Commits|Changelog|Compatibility score)\s*</summary>.*?</details\s*>",
+                      "", body, flags=re.IGNORECASE | re.DOTALL)
+    refs |= text_references(body, github.repository)
+    return refs | github.linked_issues(pr["number"])
+
+
+def failure_reason(error):
+    if isinstance(error, urllib.error.HTTPError):
+        return f"HTTP {error.code} at {urllib.parse.urlsplit(error.url).path}"
+    return type(error).__name__
+
+
 class AutoMerge:
     def __init__(self, github, policy, default_branch):
         self.github, self.policy, self.default_branch = github, policy, default_branch
@@ -122,9 +141,7 @@ class AutoMerge:
         return (run["id"], attempt), reasons
 
     def issues(self, pr):
-        refs = text_references(pr.get("body"), self.github.repository)
-        refs |= text_references(pr.get("title"), self.github.repository)
-        refs |= self.github.linked_issues(pr["number"])
+        refs = issue_references(pr, self.github)
         issues = []
         for repo, number in sorted(refs):
             issue = self.github.request(f"repos/{repo}/issues/{number}")
@@ -328,6 +345,9 @@ class AutoMerge:
         pr = self.github.request(endpoint)
         if pr["state"] != "open":
             return "SKIP: already closed"
+        if (pr["base"]["ref"] != self.default_branch
+                or pr["base"]["repo"]["full_name"].lower() != self.github.repository.lower()):
+            return "SKIP: contributor automation targets " + self.default_branch
         snapshot, reasons = self.inspect(pr)
         if not reasons:
             # Fetch all admission evidence again: comments/assignments/issues/CI reruns
@@ -383,9 +403,7 @@ class IssueCompletion:
         self.writer = GitHub(token, github.repository, github.policy_ref) if token else github
 
     def references(self, pr):
-        refs = text_references(pr.get("body"), self.github.repository)
-        refs |= text_references(pr.get("title"), self.github.repository)
-        return refs | self.github.linked_issues(pr["number"])
+        return issue_references(pr, self.github)
 
     def all_assigned(self, refs, author):
         for repo, number in sorted(refs):
@@ -504,7 +522,7 @@ def main():
             result = bot.process(number, dry_run)
         except Exception as error:
             errors += 1
-            result = f"ERROR: {type(error).__name__}; merge or issue completion requires a retry"
+            result = f"ERROR: {failure_reason(error)}; merge or issue completion requires a retry"
             try:
                 bot.comment(number, ["GitHub API or policy verification failed. The bot will retry; a maintainer should inspect the Automatic PR merge workflow if this persists."], dry_run)
             except Exception:
@@ -515,7 +533,7 @@ def main():
             result = completion.process(pr["number"], dry_run)
         except Exception as error:
             errors += 1
-            result = f"ERROR: {type(error).__name__}; issue completion will retry"
+            result = f"ERROR: {failure_reason(error)}; issue completion will retry"
         print(f"PR {pr['number']} issues: {safe_text(result)}", flush=True)
     return int(bool(errors))
 
