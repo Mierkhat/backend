@@ -19,6 +19,27 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
+      - name: Check out trusted PR safety policy
+        if: github.event_name == 'pull_request'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: pr-safety-base
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Scan PR before checking out contributor files
+        if: github.event_name == 'pull_request'
+        working-directory: pr-safety-base
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if git cat-file -e HEAD:.github/scripts/pr_safety.py 2>/dev/null; then
+            python3 -B .github/scripts/pr_safety.py scan
+          else
+            printf '%s\n' 'PR safety activates once the policy lands on dev.'
+          fi
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -26,6 +47,7 @@ jobs:
       - run: ./scripts/ci-security.sh
       - run: python3 -B .github/scripts/check_dependencies.py
       - run: python3 -B -m unittest discover -s .github/scripts -p "test_dependencies.py"
+      - run: python3 -B -m unittest discover -s .github/scripts -p "test_pr_safety.py"
   application:
     needs: security
     runs-on: ubuntu-24.04

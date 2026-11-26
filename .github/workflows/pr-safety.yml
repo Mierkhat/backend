@@ -1,0 +1,38 @@
+name: Trusted PR safety
+on:
+  pull_request_target:
+    branches: [dev]
+    types: [opened, synchronize, reopened, edited, ready_for_review]
+permissions:
+  contents: read
+  pull-requests: read
+  statuses: write
+concurrency:
+  group: trusted-pr-safety-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}-${{ github.event.pull_request.base.sha }}
+  cancel-in-progress: false
+jobs:
+  scan:
+    name: Scan PR contents from trusted base
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      PR_BASE: ${{ github.event.pull_request.base.sha }}
+      PR_HEAD: ${{ github.event.pull_request.head.sha }}
+    steps:
+      - name: Check out the trusted base only
+        id: policy
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Inspect PR Git objects without executing them
+        id: scan
+        run: python3 -B .github/scripts/pr_safety.py scan
+      - name: Report safety status on the exact PR head
+        if: always() && steps.policy.outcome == 'success'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          SCAN_OUTCOME: ${{ steps.scan.outcome }}
+        run: python3 -B .github/scripts/pr_safety.py report --outcome "$SCAN_OUTCOME"

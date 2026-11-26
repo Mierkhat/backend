@@ -145,6 +145,8 @@ class IssueCompletionTests(unittest.TestCase):
 
     def test_assignment_revoked_after_merge_prevents_issue_completion(self):
         self.api.pr.update(state="open", merged=False, merged_at=None)
+        self.api.statuses = [{"context": "PR safety", "state": "success", "description": f"Scanned against {BASE}",
+                              "creator": {"login": "github-actions[bot]"}}]
         policy = Mock()
         policy.decision.return_value = (True, "assigned")
         request = self.api.request

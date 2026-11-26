@@ -39,7 +39,10 @@ class FakeGitHub:
         self.issue = {"title": "Fix bug", "body": "Acceptance criteria", "state": "open",
                       "assignees": [{"login": "alice"}]}
         self.refs = set()
-        self.comments, self.reviews, self.statuses, self.checks = [], [], [], []
+        self.comments, self.reviews, self.checks = [], [], []
+        self.safety = [{"context": "PR safety", "state": "success", "description": f"Scanned against {BASE}",
+                        "creator": {"login": "github-actions[bot]"}}]
+        self.statuses = []
         self.resolved, self.branch = True, BASE
         self.writes, self.reads = [], []
         self.extra_runs, self.extra_jobs = {}, {}
@@ -94,7 +97,7 @@ class FakeGitHub:
         if path.endswith("/comments"):
             return iter(copy.deepcopy(self.comments))
         if path.endswith("/statuses"):
-            return iter(copy.deepcopy(self.statuses))
+            return iter(copy.deepcopy(self.safety + self.statuses))
         raise AssertionError(path)
 
 
@@ -122,6 +125,14 @@ class AutoMergeTests(unittest.TestCase):
         self.assertEqual(data["merge_method"], "merge")
         self.assertNotIn("co-authored-by", str(data).lower())
         self.assertEqual(self.policy.decision.call_count, 2)
+
+    def test_missing_stale_or_untrusted_safety_status_prevents_merge(self):
+        valid = copy.deepcopy(self.api.safety[0])
+        for status in (None, {**valid, "description": f"Scanned against {HEAD}"},
+                       {**valid, "creator": {"login": "alice"}}, {**valid, "state": "failure"}):
+            with self.subTest(status=status):
+                self.api.safety = [status] if status else []
+                self.assert_wait("A trusted PR safety scan must pass")
 
     def test_dry_run_performs_no_remote_writes(self):
         self.assertTrue(self.bot.process(1, True).startswith("WOULD MERGE"))

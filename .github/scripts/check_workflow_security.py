@@ -9,29 +9,54 @@ POLICIES = {
                           "enforce_pr_assignments", "enforce_pr_assignments"),
     "approve-pr-ci.yml": ({"contents": "read", "issues": "read", "pull-requests": "read", "actions": "write"},
                          "enforce_pr_assignments,approve_pr_ci", "approve_pr_ci"),
-    "auto-merge-prs.yml": ({"contents": "write", "pull-requests": "write", "issues": "write", "actions": "read", "checks": "read"},
+    "auto-merge-prs.yml": ({"contents": "write", "pull-requests": "write", "issues": "write", "actions": "read", "checks": "read", "statuses": "read"},
                          "enforce_pr_assignments,check_pr_description,auto_merge_prs", "auto_merge_prs"),
 }
 
 
+def permissions(text):
+    block = re.search(r"(?m)^permissions:\n((?:  [^\n]+\n)+)", text)
+    if not block or len(re.findall(r"(?m)^\s*permissions:", text)) != 1:
+        raise ValueError("Workflow must have one top-level permission block")
+    return dict(re.findall(r"^  ([\w-]+): (read|write)\s*$", block[1], re.MULTILINE))
+
+
+def validate_pr_safety(text, actions):
+    checkout = "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1"
+    allowed_expressions = {"github.event.pull_request.number", "github.event.pull_request.base.sha",
+                           "github.event.pull_request.head.sha", "github.token", "steps.scan.outcome"}
+    commands = re.findall(r"(?m)^\s*run: (.*)$", text)
+    expected_commands = ["python3 -B .github/scripts/pr_safety.py scan",
+                         'python3 -B .github/scripts/pr_safety.py report --outcome "$SCAN_OUTCOME"']
+    checkout_inputs = re.search(r"(?m)^        with:\n((?:          [^\n]+\n)+)", text)
+    if (actions != [checkout] or commands != expected_commands or not checkout_inputs
+            or permissions(text) != {"contents": "read", "pull-requests": "read", "statuses": "write"}
+            or checkout_inputs[1].splitlines() != [
+                "          ref: ${{ github.event.pull_request.base.sha }}",
+                "          persist-credentials: false", "          fetch-depth: 0"]
+            or not {part.strip() for part in re.findall(r"\$\{\{(.*?)\}\}", text)} <= allowed_expressions
+            or "on:\n  pull_request_target:\n    branches: [dev]\n" not in text):
+        raise ValueError("PR safety must execute only the trusted dev base policy with scoped status permissions")
+
+
 def validate(name, text, bootstrap):
-    actions = re.findall(r"uses:\s*([^\s#]+)", text)
+    actions = re.findall(r"(?m)^\s*(?:-\s*)?uses:[ \t]*([^\s#]+)", text)
     if any(not re.fullmatch(r"[A-Za-z0-9_./-]+@[0-9a-f]{40}", action) for action in actions):
         raise ValueError("Actions must use full commit SHAs")
     if "write-all" in text:
         raise ValueError("Unbounded workflow permissions")
+    if name == "pr-safety.yml":
+        validate_pr_safety(text, actions)
+        return
     if name not in POLICIES:
         if "pull_request_target" in text or "workflow_run" in text:
             raise ValueError("Unexpected privileged workflow")
         return
-    permissions, modules, entrypoint = POLICIES[name]
+    required_permissions, modules, entrypoint = POLICIES[name]
     if actions != [HARDEN_RUNNER]:
         raise ValueError("Policy workflows may only use the pinned network isolation action")
-    block = re.search(r"(?m)^permissions:\n((?:  [^\n]+\n)+)", text)
-    if not block or dict(re.findall(r"^  ([\w-]+): (read|write)\s*$", block[1], re.MULTILINE)) != permissions:
+    if permissions(text) != required_permissions:
         raise ValueError("Policy permissions differ from the required scope")
-    if len(re.findall(r"(?m)^\s*permissions:", text)) != 1:
-        raise ValueError("Policy jobs cannot override permissions")
     expressions = re.findall(r"\$\{\{(.*?)\}\}", text)
     for expression in expressions:
         if ("secrets." in expression and not (name == "auto-merge-prs.yml" and expression.strip() == "secrets.MIERKHAT_ISSUE_COMPLETION_TOKEN")) or ("github.event." in expression and expression.strip() != "github.event.repository.default_branch"):

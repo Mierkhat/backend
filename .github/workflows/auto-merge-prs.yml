@@ -24,6 +24,7 @@ permissions:
   issues: write
   actions: read
   checks: read
+  statuses: read
 
 concurrency:
   group: auto_merge_prs-${{ github.repository }}

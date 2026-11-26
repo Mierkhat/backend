@@ -238,9 +238,10 @@ class AutoMerge:
                            "status": run.get("status"), "conclusion": run.get("conclusion")})
         return result
 
-    def checks(self, pr):
+    def checks(self, pr, require_safety=True):
         reasons = []
         revisions = {pr["head"]["sha"]}
+        safety_verified = False
         merge_sha = pr.get("merge_commit_sha")
         if isinstance(merge_sha, str) and SHA.fullmatch(merge_sha):
             revisions.add(merge_sha)
@@ -255,8 +256,16 @@ class AutoMerge:
                 if context in seen:
                     continue
                 seen.add(context)
+                if sha == pr["head"]["sha"] and context == "PR safety":
+                    safety_verified = (
+                        status.get("state") == "success"
+                        and status.get("description") == f"Scanned against {pr['base']['sha']}"
+                        and (status.get("creator") or {}).get("login") == "github-actions[bot]"
+                    )
                 if status.get("state") != "success":
                     reasons.append(f"Status {context} is {status.get('state', 'pending')}. Fix it or wait for success.")
+        if require_safety and not safety_verified:
+            reasons.append("A trusted PR safety scan must pass for the current head and dev base.")
         return reasons
 
     def inspect(self, pr):
@@ -448,7 +457,7 @@ class IssueCompletion:
         _, reasons = verifier.current_ci(pr)
         # Post-merge push checks are separate from the PR's checks. The original
         # PR head must pass every gate; a newer failed/pending rerun blocks closure.
-        reasons.extend(verifier.checks({**pr, "merge_commit_sha": None}))
+        reasons.extend(verifier.checks({**pr, "merge_commit_sha": None}, require_safety=False))
         if reasons:
             return "WAIT: PR checks have not all succeeded; issues preserved"
         completed, errors = 0, []
