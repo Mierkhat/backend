@@ -1,1 +1,1 @@
-left                                        right
+Ordinary inert text.
